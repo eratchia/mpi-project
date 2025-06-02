@@ -5,7 +5,7 @@ ALL := sssp
 
 all : $(ALL)
 
-sssp: ../../sssp/sssp.cpp
+sssp: ../../../sssp/sssp.cpp
 	$(MPICC) $(LFLAGS) -o $@ $< 
 
 clean :
