@@ -1,7 +1,7 @@
 CC := c++    # use mpiCC when not on okeanos
 MPICC := mpicc    # use mpiCC when not on okeanos
 LFLAGS := -std=c++17 -g
-ALL := bin/dijkstra
+ALL := bin/dijkstra bin/sssp
 
 all : $(ALL)
 
