@@ -6,7 +6,7 @@ import filecmp
 def run_tests(break_on_fail, local):
     Path("outputs").mkdir(parents=True, exist_ok=True)
     for solution in Path(".").iterdir():
-        if solution.is_dir() and not solution.name in ["tests", "outputs"]:
+        if solution.is_dir() and not solution.name in ["tests", "outputs", "error"]:
             make = subprocess.run("make", cwd=solution.name, capture_output=True, timeout=300)
             if make.returncode != 0:
                 print(f"{solution.name}: FAILED (make)")
