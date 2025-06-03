@@ -143,7 +143,7 @@ void setup() {
 				if (ind == 0) {
 					outside_address[dest] = {0, dest};
 				} else {
-					outside_address[dest] = {ind, dest - ends[ind - 1]};
+					outside_address[dest] = {ind, dest - ends[ind - 1] - 1};
 				}
 			}
 		}
