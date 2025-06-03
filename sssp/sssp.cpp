@@ -301,7 +301,6 @@ void read(string file) {
 }
 
 void write_out(string file) {
-	err << file;
 	std::fstream out(file, std::ios_base::out);
 
 	for(auto len: *dist) {
@@ -345,8 +344,9 @@ int main(int argc, char* argv[]) {
 	std::stringstream s;
 	s << myRank << ".err";
 
-	err.open(s.str());
+	err.open(s.str(), std::ios_base::out);
 	err << "xxx" << "\n";
+	err.close();
 
 	read(argv[1]);
 	setup();
@@ -357,8 +357,6 @@ int main(int argc, char* argv[]) {
 	}
 
 	write_out(argv[2]);
-
-	err.close();
 
 	finish();
 }
