@@ -342,11 +342,10 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
 	std::stringstream s;
-	s << myRank << ".err";
+	s << "error/" << myRank << ".err";
 
 	err.open(s.str(), std::ios_base::out);
-	err << "xxx" << "\n";
-	err.close();
+	err << "xxx" << std::endl;
 
 	read(argv[1]);
 	setup();
@@ -357,6 +356,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	write_out(argv[2]);
+
+	err.close();
 
 	finish();
 }
