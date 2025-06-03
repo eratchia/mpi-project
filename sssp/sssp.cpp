@@ -56,9 +56,7 @@ private:
 public:
 	Local(): index(0) {}
 	Local(const Local& other): index(other.index) {}
-	Local(int ind): index(ind - start) {
-		assert(is_local(ind));
-	}
+	Local(int ind): index(ind - start) {}
 	Local(from_local_t, int ind): index(ind) {
 		assert(is_local(ind));
 	}
