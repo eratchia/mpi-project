@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <cassert>
 #include <vector>
@@ -17,6 +18,8 @@ constexpr long long inf = 5'000'000'000'000'000'000;
 static_assert(inf > 0, "Bad inf size");
 constexpr long long delta = 10;
 static_assert(delta > 0, "Bad delta size");
+
+std::fstream err;
 
 int n;
 int start, end;
@@ -298,8 +301,8 @@ void read(string file) {
 }
 
 void write_out(string file) {
+	err << file;
 	std::fstream out(file, std::ios_base::out);
-	std::cerr << file << "\n";
 
 	for(auto len: *dist) {
 		out << len << "\n";		
@@ -337,6 +340,11 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
+	std::stringstream s;
+	s << myRank << ".err";
+
+	err.open(s.str());
+
 	read(argv[1]);
 	setup();
 
@@ -346,6 +354,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	write_out(argv[2]);
+
+	err.close();
 
 	finish();
 }
