@@ -121,6 +121,7 @@ LocalVector<long long> vertex_window_data;
 MPI_Win vertex_window;
 
 bool bellmanFordStep() {
+	err << "starting bellman-ford in phase: " << phases << std::endl;
 	LocalVector<bool> new_changed;
 	bool was_changed;
 
@@ -128,12 +129,20 @@ bool bellmanFordStep() {
 		v = inf;
 	}
 
+	err << "Before fencing" << std::endl;
+
 	MPI_Win_fence(MPI_MODE_NOPRECEDE, vertex_window);
+
+	err << "Starting communication" << std::endl;
+
 	for(int src = start; src <= end; src++) {
+		err << "Handling vertex: " << src << std::endl;
 		if (changed[src]) {
 			for(auto [dest, len]: edges[src]) {
+				err << "Handling destination: " << dest << std::endl;
 				long long new_dist = dist[src] + len;
 				if (is_local(dest)) {
+					err << "Local vertex" << std::endl;
 					local_relaxations++;
 					if (new_dist < dist[dest]) {
 						dist[dest] = new_dist;
@@ -141,6 +150,7 @@ bool bellmanFordStep() {
 						was_changed = true;
 					}
 				} else {
+					err << "Global vertex" << std::endl;
 					auto [destRank, destId] = outside_address[dest];
 					non_phase_comms++;
 					MPI_Accumulate(
@@ -158,7 +168,12 @@ bool bellmanFordStep() {
 			}
 		}
 	}
+
+	err << "Ending communication" << std::endl;
+
 	MPI_Win_fence(MPI_MODE_NOSUCCEED, vertex_window);
+
+	err << "After fencing" << std::endl;
 
 	for(int src = start; src <= end; src++) {
 		if (vertex_window_data[src] < dist[src]) {
@@ -168,6 +183,8 @@ bool bellmanFordStep() {
 		}	
 	}
 
+	err << "Starting reduce" << std::endl;
+
 	MPI_Allreduce(
 		&was_changed, 
 		&was_changed, 
@@ -176,6 +193,8 @@ bool bellmanFordStep() {
 		MPI_LOR, 
 		MPI_COMM_WORLD
 	);
+	err << "Ending reduce" << std::endl;
+
 	changed = new_changed;
 
 	return was_changed;
@@ -343,9 +362,7 @@ int main(int argc, char* argv[]) {
 
 	std::stringstream s;
 	s << "error/" << myRank << ".err";
-
 	err.open(s.str(), std::ios_base::out);
-	err << "xxx" << std::endl;
 
 	read(argv[1]);
 	setup();
