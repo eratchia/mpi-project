@@ -120,7 +120,7 @@ MPI_Win vertex_window;
 
 bool bellmanFordStep() {
 	err << "starting bellman-ford in phase: " << phases << std::endl;
-	LocalVector<bool> new_changed;
+	LocalVector<bool> new_changed(length);
 	bool was_changed;
 
 	for(auto& v: *vertex_window_data) {
