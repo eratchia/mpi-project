@@ -20,6 +20,9 @@ static_assert(delta > 0, "Bad delta size");
 
 int n;
 int start, end;
+int length;
+
+int phases = 0, local_relaxations = 0, non_phase_comms = 0;
 
 int numProcesses;
 int myRank;
@@ -33,6 +36,13 @@ vector<int> ends; ///< The last vertices kept in each process
 // mapping from known outside vertices to their (process, local_id)
 unordered_map<int, pair<int, int>> outside_address;
 
+bool is_local(const int index) {
+	return start <= index && index <= end;
+} 
+
+struct from_local_t {};
+from_local_t from_local;
+
 class Local {
 private:
 	int index;	
@@ -43,16 +53,17 @@ private:
 public:
 	Local(): index(0) {}
 	Local(const Local& other): index(other.index) {}
-	Local(int ind): index(ind) {}
+	Local(int ind): index(ind - start) {
+		assert(is_local(ind));
+	}
+	Local(from_local_t, int ind): index(ind) {
+		assert(is_local(ind));
+	}
 
 	int global() const {
 		return start + index;
 	}
 };
-
-bool is_local(const int index) {
-	return start <= index && index <= end;
-} 
 
 template<class T>
 class LocalVector {
@@ -70,29 +81,110 @@ public:
 		return &data;
 	}
 
-	T& operator[](const int index) {
+	vector<T>& operator*() {
+		return data;
+	}
+
+	const vector<T>& operator*() const {
+		return data;
+	}
+
+
+	typename vector<T>::reference operator[](const int index) {
 		assert(is_local(index));
 		return data[Local(index).index];
 	}
 
-	const T& operator[](const int index) const {
+	typename vector<T>::const_reference operator[](const int index) const {
 		assert(is_local(index));
 		return data[Local(index).index];
 	}
 
-	T& operator[](const Local index) {
+	typename vector<T>::reference operator[](const Local index) {
 		return data[index.index];
 	}
 
-	const T& operator[](const Local index) const {
+	typename vector<T>::const_reference operator[](const Local index) const {
 		return data[index.index];
 	}
 };
 
 LocalVector<vector<pair<int, long long>>> edges(n);
+LocalVector<long long> dist; ///< Local distances from 0
+LocalVector<bool> settled;
+LocalVector<bool> changed;
+LocalVector<long long> vertex_window_data;
+
+MPI_Win vertex_window;
+
+bool bellmanFordStep() {
+	LocalVector<bool> new_changed;
+	bool was_changed;
+
+	for(auto& v: *vertex_window_data) {
+		v = inf;
+	}
+
+	MPI_Win_fence(MPI_MODE_NOPRECEDE, vertex_window);
+	for(int src = start; src <= end; src++) {
+		if (changed[src]) {
+			for(auto [dest, len]: edges[src]) {
+				long long new_dist = dist[src] + len;
+				if (is_local(dest)) {
+					local_relaxations++;
+					if (new_dist < dist[dest]) {
+						dist[dest] = new_dist;
+						new_changed[dest] = true;
+						was_changed = true;
+					}
+				} else {
+					auto [destRank, destId] = outside_address[dest];
+					non_phase_comms++;
+					MPI_Accumulate(
+						&new_dist, 
+						1, 
+						MPI_LONG_LONG, 
+						destRank, 
+						sizeof(long long) * destId, 
+						1, 
+						MPI_LONG_LONG, 
+						MPI_MIN, 
+						vertex_window
+					);
+				}
+			}
+		}
+	}
+	MPI_Win_fence(MPI_MODE_NOSUCCEED, vertex_window);
+
+	for(int src = start; src <= end; src++) {
+		if (vertex_window_data[src] < dist[src]) {
+			dist[src] = vertex_window_data[src];
+			new_changed[src] = true; 
+			was_changed = true;
+		}	
+	}
+
+	MPI_Allreduce(
+		&was_changed, 
+		&was_changed, 
+		1, 
+		MPI_CXX_BOOL, 
+		MPI_LOR, 
+		MPI_COMM_WORLD
+	);
+	changed = new_changed;
+
+	return was_changed;
+}
 
 void setup() {
+	length = end - start + 1;
+	dist->resize(length);
+	settled->resize(length);
+	changed->resize(length);
 	ends.resize(numProcesses);
+	vertex_window_data->resize(length);
 	// Collect common start/end of vertices of each process
 	if (myRank == 0) {
 		ends[0] = end;
@@ -136,6 +228,7 @@ void setup() {
 		0,
 		MPI_COMM_WORLD
 	);
+	// Calculate outside mapping
 	for(int src = start; src <= end; src++) {
 		for(auto [dest, len]: edges[src]) {
 			if (!is_local(dest)) {
@@ -148,6 +241,13 @@ void setup() {
 			}
 		}
 	}
+	for(int src = start; src <= end; src++) {
+		if (src == 0) {
+			dist[src] = 0;
+		} else {
+			dist[src] = inf;
+		}
+	}
 	// Define the intra node split communicator
 	MPI_Comm_split_type(
 		MPI_COMM_WORLD, 
@@ -158,23 +258,28 @@ void setup() {
 	);
     MPI_Comm_size(intra_node_comm, &intraNum);
     MPI_Comm_rank(intra_node_comm, &intraRank);
+	// Setup window
+	MPI_Win_create(
+		vertex_window_data->data(), 
+		sizeof(long long) * length, 
+		sizeof(long long), 
+		MPI_INFO_NULL, 
+		MPI_COMM_WORLD, 
+		&vertex_window
+	);
+	for(int src = start; src <= end; src++) {
+		changed[src] = false;
+	}
+	if (myRank == 0) {
+		changed[0] = true;
+	}
 	/**
 	 * Maybe add inter and intra-node load balancing
 	 */
-	
 }
 
-int main(int argc, char* argv[]) {
-	if (argc != 3) {
-		cerr << "Usage: " << string(argv[0]) << " input_file output_file"; 
-		return 1;
-	}
-
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
-    MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
-
-	std::fstream in(string(argv[1]), std::ios_base::in);
+void read(string file) {
+	std::fstream in(file, std::ios_base::in);
 
 	in >> n >> start >> end;
 	edges->resize(n);
@@ -190,10 +295,20 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	in.close();
+}
 
-	setup();
+void write_out(string file) {
+	std::fstream out(file, std::ios_base::out);
 
-	std::fstream out(string(argv[2]), std::ios_base::out);
+	for(auto len: *dist) {
+		out << len << "\n";		
+	}
+	
+	out.close();
+}
+
+void write_debug(string file) {
+	std::fstream out(string(file), std::ios_base::out);
 	out << "Global:" << myRank << "/" << numProcesses << "\n";
 	out << "Local:" << intraRank << "/" << intraNum << "\n";
 	out << "max_length: " << max_length << "\n";
@@ -205,4 +320,31 @@ int main(int argc, char* argv[]) {
 		out << src << " -> " << rest.first << ", " << rest.second << "\n";
 	}
 	out.close();
+}
+
+void finish() {
+	MPI_Win_free(&vertex_window);
+}
+
+int main(int argc, char* argv[]) {
+	if (argc != 3) {
+		cerr << "Usage: " << string(argv[0]) << " input_file output_file"; 
+		return 1;
+	}
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
+
+	read(argv[1]);
+	setup();
+
+	phases++;
+	while(bellmanFordStep()) {
+		phases++;
+	}
+
+	write_out(argv[2]);
+
+	finish();
 }
