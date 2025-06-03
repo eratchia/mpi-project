@@ -299,6 +299,7 @@ void read(string file) {
 
 void write_out(string file) {
 	std::fstream out(file, std::ios_base::out);
+	std::cerr << file << "\n";
 
 	for(auto len: *dist) {
 		out << len << "\n";		
