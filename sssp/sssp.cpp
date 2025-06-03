@@ -194,7 +194,9 @@ bool bellmanFordStep() {
 	);
 	err << "Ending reduce" << std::endl;
 
-	changed = new_changed;
+	for(auto src = start; src <= end; src++) {
+		changed[src] = new_changed[src];
+	}
 
 	return global_changed;
 }
@@ -262,13 +264,6 @@ void setup() {
 			}
 		}
 	}
-	for(int src = start; src <= end; src++) {
-		if (src == 0) {
-			dist[src] = 0;
-		} else {
-			dist[src] = inf;
-		}
-	}
 	// Define the intra node split communicator
 	MPI_Comm_split_type(
 		MPI_COMM_WORLD, 
@@ -290,9 +285,11 @@ void setup() {
 	);
 	for(int src = start; src <= end; src++) {
 		changed[src] = false;
+		dist[src] = inf;
 	}
 	if (myRank == 0) {
 		changed[0] = true;
+		dist[0] = 0;
 	}
 	/**
 	 * Maybe add inter and intra-node load balancing
