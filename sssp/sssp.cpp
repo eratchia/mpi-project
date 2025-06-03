@@ -2,11 +2,13 @@
 #include <fstream>
 #include <cassert>
 #include <vector>
+#include <unordered_map>
 #include "mpi.h"
 
 using std::cerr;
 using std::string;
 using std::vector;
+using std::unordered_map;
 using std::pair;
 using std::max;
 using std::min;
@@ -26,7 +28,10 @@ MPI_Comm intra_node_comm;
 int intraRank, intraNum;
 
 int max_length;
-vector<int> ends;
+vector<int> ends; ///< The last vertices kept in each process
+
+// mapping from known outside vertices to their (process, local_id)
+unordered_map<int, pair<int, int>> outside_address;
 
 class Local {
 private:
@@ -57,12 +62,12 @@ public:
 	LocalVector(): data() {}
 	LocalVector(int n, const T def = {}): data(n, def) {}
 
-	vector<T>& operator->() {
-		return data;
+	vector<T>* operator->() {
+		return &data;
 	}
 
-	const vector<T>& operator->() const {
-		return data;
+	const vector<T>* operator->() const {
+		return &data;
 	}
 
 	T& operator[](const int index) {
@@ -84,8 +89,11 @@ public:
 	}
 };
 
+LocalVector<vector<pair<int, long long>>> edges(n);
+
 void setup() {
 	ends.resize(numProcesses);
+	// Collect common start/end of vertices of each process
 	if (myRank == 0) {
 		ends[0] = end;
 		for(int i = 1; i < numProcesses; i++) {
@@ -113,18 +121,7 @@ void setup() {
 			MPI_COMM_WORLD
 		);
 	}
-	/**
-	 * Maybe add intra-node load balancing
-	 */
-	MPI_Comm_split_type(
-		MPI_COMM_WORLD, 
-		MPI_COMM_TYPE_SHARED, 
-		0, 
-		MPI_INFO_NULL, 
-		&intra_node_comm
-	);
-    MPI_Comm_size(intra_node_comm, &intraNum);
-    MPI_Comm_rank(intra_node_comm, &intraRank);
+	// Get common values
 	MPI_Bcast(
 		&max_length, 
 		1, 
@@ -139,6 +136,32 @@ void setup() {
 		0,
 		MPI_COMM_WORLD
 	);
+	for(int src = start; src <= end; src++) {
+		for(auto [dest, len]: edges[src]) {
+			if (!is_local(dest)) {
+				int ind = std::lower_bound(ends.begin(), ends.end(), dest) - ends.begin();
+				if (ind == 0) {
+					outside_address[ind] = {0, dest};
+				} else {
+					outside_address[ind] = {ind, dest - ends[ind - 1]};
+				}
+			}
+		}
+	}
+	// Define the intra node split communicator
+	MPI_Comm_split_type(
+		MPI_COMM_WORLD, 
+		MPI_COMM_TYPE_SHARED, 
+		0, 
+		MPI_INFO_NULL, 
+		&intra_node_comm
+	);
+    MPI_Comm_size(intra_node_comm, &intraNum);
+    MPI_Comm_rank(intra_node_comm, &intraRank);
+	/**
+	 * Maybe add inter and intra-node load balancing
+	 */
+	
 }
 
 int main(int argc, char* argv[]) {
@@ -154,7 +177,7 @@ int main(int argc, char* argv[]) {
 	std::fstream in(string(argv[1]), std::ios_base::in);
 
 	in >> n >> start >> end;
-	LocalVector<vector<pair<int, long long>>> edges(n);
+	edges->resize(n);
 	int x, y;
 	long long len;
 	while(in >> x) {
@@ -178,5 +201,8 @@ int main(int argc, char* argv[]) {
 		out << ends[i] << " ";
 	}
 	out << "\n";
+	for(auto [src, rest]: outside_address) {
+		out << src << " -> " << rest.first << ", " << rest.second << "\n";
+	}
 	out.close();
 }
