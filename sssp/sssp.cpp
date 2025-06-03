@@ -141,9 +141,9 @@ void setup() {
 			if (!is_local(dest)) {
 				int ind = std::lower_bound(ends.begin(), ends.end(), dest) - ends.begin();
 				if (ind == 0) {
-					outside_address[ind] = {0, dest};
+					outside_address[dest] = {0, dest};
 				} else {
-					outside_address[ind] = {ind, dest - ends[ind - 1]};
+					outside_address[dest] = {ind, dest - ends[ind - 1]};
 				}
 			}
 		}
