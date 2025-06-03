@@ -28,7 +28,8 @@ def run_tests(break_on_fail, local):
                 if execution.returncode != 0:
                     print(f"    {test.name}: FAILED (srun)")
                     if break_on_fail:
-                        print(execution.stdout)
+                        print(f"{execution.stdout=}")
+                        print(f"{execution.stderr=}")
                         exit(1)
                     continue
                 failed = False
