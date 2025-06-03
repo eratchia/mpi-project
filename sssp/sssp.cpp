@@ -22,6 +22,9 @@ int start, end;
 int numProcesses;
 int myRank;
 
+MPI_Comm intra_node_comm;
+int intraRank, intraNum;
+
 int max_length;
 vector<int> ends;
 
@@ -110,6 +113,18 @@ void setup() {
 			MPI_COMM_WORLD
 		);
 	}
+	/**
+	 * Maybe add intra-node load balancing
+	 */
+	MPI_Comm_split_type(
+		MPI_COMM_WORLD, 
+		MPI_COMM_TYPE_SHARED, 
+		0, 
+		MPI_INFO_NULL, 
+		&intra_node_comm
+	);
+    MPI_Comm_size(intra_node_comm, &intraNum);
+    MPI_Comm_rank(intra_node_comm, &intraRank);
 	MPI_Bcast(
 		&max_length, 
 		1, 
@@ -156,7 +171,8 @@ int main(int argc, char* argv[]) {
 	setup();
 
 	std::fstream out(string(argv[2]), std::ios_base::out);
-	out << myRank << "/" << numProcesses << "\n";
+	out << "Global:" << myRank << "/" << numProcesses << "\n";
+	out << "Local:" << intraRank << "/" << intraNum << "\n";
 	out << "max_length: " << max_length << "\n";
 	for(int i = 0; i < numProcesses; i++) {
 		out << ends[i] << " ";
