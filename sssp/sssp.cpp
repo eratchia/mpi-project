@@ -331,10 +331,12 @@ void finish() {
 }
 
 int main(int argc, char* argv[]) {
+	std::cout << "xxx" << std::endl;
 	if (argc != 3) {
 		cerr << "Usage: " << string(argv[0]) << " input_file output_file"; 
 		return 1;
 	}
+	std::cout << "yyy" << std::endl;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
@@ -344,6 +346,7 @@ int main(int argc, char* argv[]) {
 	s << myRank << ".err";
 
 	err.open(s.str());
+	err << "xxx" << "\n";
 
 	read(argv[1]);
 	setup();
