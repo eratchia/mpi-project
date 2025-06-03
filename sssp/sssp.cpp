@@ -120,8 +120,9 @@ MPI_Win vertex_window;
 
 bool bellmanFordStep() {
 	err << "starting bellman-ford in phase: " << phases << std::endl;
-	LocalVector<bool> new_changed(length);
-	bool was_changed;
+	LocalVector<bool> new_changed(length, false);
+	bool was_changed = false;
+	bool global_changed = false;
 
 	for(auto& v: *vertex_window_data) {
 		v = inf;
@@ -185,7 +186,7 @@ bool bellmanFordStep() {
 
 	MPI_Allreduce(
 		&was_changed, 
-		&was_changed, 
+		&global_changed, 
 		1, 
 		MPI_CXX_BOOL, 
 		MPI_LOR, 
@@ -195,7 +196,7 @@ bool bellmanFordStep() {
 
 	changed = new_changed;
 
-	return was_changed;
+	return global_changed;
 }
 
 void setup() {
