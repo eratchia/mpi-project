@@ -157,7 +157,7 @@ bool bellmanFordStep() {
 						1, 
 						MPI_LONG_LONG, 
 						destRank, 
-						sizeof(long long) * destId, 
+						destId, 
 						1, 
 						MPI_LONG_LONG, 
 						MPI_MIN, 
