@@ -38,6 +38,7 @@ vector<int> ends; ///< The last vertices kept in each process
 
 // mapping from known outside vertices to their (process, local_id)
 unordered_map<int, pair<int, int>> outside_address;
+unordered_map<int, long long> outside_bucket;
 
 bool is_local(const int index) {
 	return start <= index && index <= end;
@@ -119,6 +120,7 @@ LocalVector<long long> vertex_window_data;
 MPI_Win vertex_window;
 
 void deltaEpochSetup(long long base) {
+	outside_bucket = {};
 	for(int src = start; src <= end; src++) {
 		if (dist[src] >= base && dist[src] < base + delta) {
 			changed[src] = true;
@@ -128,6 +130,7 @@ void deltaEpochSetup(long long base) {
 	}
 }
 
+template<bool classification>
 bool deltaSingleStep(long long base) {
 	// err << "Starting delta single step with base: " << base << std::endl;
 	bool was_changed = false, global_changed = false;
@@ -147,6 +150,15 @@ bool deltaSingleStep(long long base) {
 		if (active[src]) {
 			for(auto [dest, len]: edges[src]) {
 				long long new_dist = dist[src] + len;
+				if constexpr (classification) {
+					if (new_dist >= base + delta) {
+						if (outside_bucket.find(dest) == outside_bucket.end()) {
+							outside_bucket[dest] = new_dist;
+						} else {
+							outside_bucket[dest] = min(outside_bucket[dest], new_dist);
+						}
+					}
+				}
 				if (is_local(dest)) {
 					local_relaxations++;
 					if (new_dist < dist[dest]) {
@@ -199,6 +211,44 @@ bool deltaSingleStep(long long base) {
 	return global_changed;
 }
 
+void deltaLongPhase() {
+	for(auto& v: *vertex_window_data) {
+		v = inf;
+	}
+
+	for(int src = start; src <= end; src++) {
+		changed[src] = false;
+	}
+
+	MPI_Win_fence(MPI_MODE_NOPRECEDE, vertex_window);
+
+	for(auto [dest, new_dist]: outside_bucket) {
+		auto [destRank, destId] = outside_address[dest];
+		non_phase_comms++;
+		MPI_Accumulate(
+			&new_dist, 
+			1, 
+			MPI_LONG_LONG, 
+			destRank, 
+			destId, 
+			1, 
+			MPI_LONG_LONG, 
+			MPI_MIN, 
+			vertex_window
+		);
+	}
+
+	MPI_Win_fence(MPI_MODE_NOSUCCEED, vertex_window);
+
+	for(int src = start; src <= end; src++) {
+		if (vertex_window_data[src] < dist[src]) {
+			dist[src] = vertex_window_data[src];
+			changed[src] = true;
+		}	
+	}
+}
+
+template <bool classification>
 bool deltaEpoch() {
 	long long min_dist = inf, global_min_dist = inf;
 	for(int src = start; src <= end; src++) {
@@ -217,8 +267,12 @@ bool deltaEpoch() {
 	deltaEpochSetup(global_min_dist);
 
 	non_phase_steps++;
-	while(deltaSingleStep(global_min_dist)) {
+	while(deltaSingleStep<classification>(global_min_dist)) {
 		non_phase_steps++;
+	}
+
+	if constexpr (classification) {
+		deltaLongPhase();
 	}
 
 	for(int src = start; src <= end; src++) {
@@ -465,7 +519,7 @@ int main(int argc, char* argv[]) {
 	setup();
 
 	phases++;
-	while(deltaEpoch()) {
+	while(deltaEpoch<true>()) {
 		phases++;
 	}
 
