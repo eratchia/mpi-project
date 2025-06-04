@@ -219,6 +219,12 @@ bool deltaEpoch() {
 		non_phase_steps++;
 	}
 
+	for(int src = start; src <= end; src++) {
+		if (dist[src] < global_min_dist + delta) {
+			settled[src] = true;
+		}
+	}
+
 	return true;
 }
 
