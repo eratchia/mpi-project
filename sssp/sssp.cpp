@@ -457,7 +457,7 @@ int main(int argc, char* argv[]) {
 	setup();
 
 	phases++;
-	while(bellmanFordStep()) {
+	while(deltaEpoch()) {
 		phases++;
 	}
 
