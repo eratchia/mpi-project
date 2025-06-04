@@ -134,6 +134,7 @@ bool deltaSingleStep(long long base) {
 	LocalVector<bool> active(length, false);
 	for(int src = start; src <= end; src++) {
 		active[src] = changed[src];
+		changed[src] = false;
 	}
 
 	for(auto& v: *vertex_window_data) {
@@ -143,8 +144,8 @@ bool deltaSingleStep(long long base) {
 	MPI_Win_fence(MPI_MODE_NOPRECEDE, vertex_window);
 
 	for(int src = start; src <= end; src++) {
-		err << "Considering source: " << src << std::endl;
 		if (active[src]) {
+			err << "Considering source: " << src << std::endl;
 			for(auto [dest, len]: edges[src]) {
 				err << "Considering destination: " << dest << std::endl;
 				long long new_dist = dist[src] + len;
