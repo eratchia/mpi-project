@@ -129,7 +129,7 @@ void deltaEpochSetup(long long base) {
 }
 
 bool deltaSingleStep(long long base) {
-	err << "Starting delta single step with base: " << base << std::endl;
+	// err << "Starting delta single step with base: " << base << std::endl;
 	bool was_changed = false, global_changed = false;
 	LocalVector<bool> active(length, false);
 	for(int src = start; src <= end; src++) {
@@ -145,12 +145,9 @@ bool deltaSingleStep(long long base) {
 
 	for(int src = start; src <= end; src++) {
 		if (active[src]) {
-			err << "Considering source: " << src << std::endl;
 			for(auto [dest, len]: edges[src]) {
-				err << "Considering destination: " << dest << std::endl;
 				long long new_dist = dist[src] + len;
 				if (is_local(dest)) {
-					err << "\tWas local: " << std::endl;
 					local_relaxations++;
 					if (new_dist < dist[dest]) {
 						dist[dest] = new_dist;
@@ -160,7 +157,6 @@ bool deltaSingleStep(long long base) {
 						}
 					}
 				} else {
-					err << "\tWas global" << std::endl;
 					auto [destRank, destId] = outside_address[dest];
 					non_phase_comms++;
 					MPI_Accumulate(
