@@ -129,7 +129,7 @@ void deltaEpochSetup(long long base) {
 }
 
 bool deltaSingleStep(long long base) {
-	err << "Starting delta single step with base: " << base << std::endl;
+	// err << "Starting delta single step with base: " << base << std::endl;
 	bool was_changed = false, global_changed = false;
 	LocalVector<bool> active(length, false);
 	for(int src = start; src <= end; src++) {
