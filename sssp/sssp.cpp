@@ -16,7 +16,7 @@ using std::min;
 
 constexpr long long inf = 5'000'000'000'000'000'000;
 static_assert(inf > 0, "Bad inf size");
-constexpr long long delta = 10;
+constexpr long long delta = inf;
 static_assert(delta > 0, "Bad delta size");
 
 std::fstream err;
@@ -25,7 +25,7 @@ int n;
 int start, end;
 int length;
 
-int phases = 0, local_relaxations = 0, non_phase_comms = 0;
+int phases = 0, non_phase_steps = 0, local_relaxations = 0, non_phase_comms = 0;
 
 int numProcesses;
 int myRank;
@@ -117,6 +117,110 @@ LocalVector<bool> changed;
 LocalVector<long long> vertex_window_data;
 
 MPI_Win vertex_window;
+
+void deltaEpochSetup(long long base) {
+	for(int src = start; src <= end; src++) {
+		if (dist[src] >= base && dist[src] < base + delta) {
+			changed[src] = true;
+		} else {
+			changed[src] = false;
+		}
+	}
+}
+
+bool deltaSingleStep(long long base) {
+	bool was_changed = false, global_changed = false;
+	LocalVector<bool> active(length, false);
+	for(int src = start; src <= end; src++) {
+		active[src] = changed[src];
+	}
+
+	for(auto& v: *vertex_window_data) {
+		v = inf;
+	}
+
+	MPI_Win_fence(MPI_MODE_NOPRECEDE, vertex_window);
+
+	for(int src = start; src <= end; src++) {
+		if (active[src]) {
+			for(auto [dest, len]: edges[src]) {
+				long long new_dist = dist[src] + len;
+				if (is_local(dest)) {
+					local_relaxations++;
+					if (new_dist < dist[dest]) {
+						dist[dest] = new_dist;
+						if (new_dist < base + delta) {
+							changed[dest] = true;
+							was_changed = true;
+						}
+					}
+				} else {
+					auto [destRank, destId] = outside_address[dest];
+					non_phase_comms++;
+					MPI_Accumulate(
+						&new_dist, 
+						1, 
+						MPI_LONG_LONG, 
+						destRank, 
+						destId, 
+						1, 
+						MPI_LONG_LONG, 
+						MPI_MIN, 
+						vertex_window
+					);
+				}
+			}
+		}
+	}
+
+	MPI_Win_fence(MPI_MODE_NOSUCCEED, vertex_window);
+
+	for(int src = start; src <= end; src++) {
+		if (vertex_window_data[src] < dist[src]) {
+			dist[src] = vertex_window_data[src];
+			if (dist[src] < base + delta) {
+				changed[src] = true; 
+				was_changed = true;
+			}
+		}	
+	}
+
+	MPI_Allreduce(
+		&was_changed, 
+		&global_changed, 
+		1, 
+		MPI_CXX_BOOL, 
+		MPI_LOR, 
+		MPI_COMM_WORLD
+	);
+
+	return global_changed;
+}
+
+bool deltaEpoch() {
+	long long min_dist = inf, global_min_dist = inf;
+	for(int src = start; src <= end; src++) {
+		if (!settled[src]) min_dist = min(min_dist, dist[src]);
+	}
+	MPI_Allreduce(
+		&min_dist, 
+		&global_min_dist, 
+		1, 
+		MPI_LONG_LONG, 
+		MPI_MIN, 
+		MPI_COMM_WORLD
+	);
+	if (global_min_dist == inf) return false;
+
+	deltaEpochSetup(global_min_dist);
+
+	non_phase_steps++;
+	while(deltaSingleStep(global_min_dist)) {
+		non_phase_steps++;
+	}
+
+	return true;
+}
 
 bool bellmanFordStep() {
 	// err << "Starting bellman-ford in phase: " << phases << std::endl;
@@ -326,6 +430,7 @@ void write_debug(string file) {
 
 void write_info() {
 	err << "Number of phases: " << phases << std::endl;
+	err << "Number of non phase steps: " << non_phase_steps << std::endl;
 	err << "Non phase related communications: " << non_phase_comms << std::endl;
 	err << "Local relaxations: " << local_relaxations << std::endl;
 }
