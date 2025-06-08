@@ -9,5 +9,5 @@ sbatch <<EOT
 #SBATCH --time 00:10:00
 
 module load common/python/3.11
-python3 run_test_perf.py ${3}
+python3 run_test_perf.py $1 $2 ${3}
 EOT

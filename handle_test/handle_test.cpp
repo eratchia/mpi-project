@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
 	for(int p = 0; p < processes; p++) {
 		string file = out_dir + "/" + to_string(p) + ".in";
 		outs[p].open(file, ios_base::out);
-		outs[p] << vertices << " " << base * p + min(bigger, p) << " " << base * (p + 1) + min(bigger, p + 1) << "\n";
+		outs[p] << vertices << " " << base * p + min(bigger, p) << " " << base * (p + 1) + min(bigger, p + 1) - 1 << "\n";
 	}
 
 	int x, y, len;
