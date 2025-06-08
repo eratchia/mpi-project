@@ -50,4 +50,4 @@ if __name__ == "__main__":
     parser.add_argument('path_to_test', help='run tests locally (without slurm)')
 
     args = parser.parse_args()
-    run_tests(args.breakonfail, args.local, args.path_to_test)
+    run_test(args.breakonfail, args.local, args.path_to_test)
