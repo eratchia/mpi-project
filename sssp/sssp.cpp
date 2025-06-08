@@ -276,16 +276,16 @@ void deltaEpochSetup(long long base) {
 	// Pick active vertices
 	auto x = vertices_by_distance.begin();
 	while(x != vertices_by_distance.end() && x->first < base + delta) {
-		auto x = *vertices_by_distance.begin();
 
 		if constexpr(sanity) {
-			if (unsettled.find(x.second) == unsettled.end()) {
-				err << "<vertex " << x.second << " at dist " << x.first << " in vertex by distance was not unsettled>" << std::endl; 
+			if (unsettled.find(x->second) == unsettled.end()) {
+				err << "<vertex " << x->second << " at dist " << x->first << " in vertex by distance was not unsettled>" << std::endl; 
 			}
 		}
 
-		active.insert(x.second); 
-		current_bucket.insert(x.second);
+		active.insert(x->second); 
+		current_bucket.insert(x->second);
+		x++;
 	}
 }
 
