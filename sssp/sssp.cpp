@@ -36,8 +36,8 @@ int phases = 0, non_phase_steps = 0, local_relaxations = 0;
 int numProcesses;
 int myRank;
 
-template<class T, template<typename> typename S>
-vector<vector<T>> shareWithAll(const vector<S<T>>& out_requests, const MPI_Datatype& mpi_type) {
+template<class T, typename S>
+vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype& mpi_type) {
 	// setup out request information
 	vector<T> flat_out_requests;
 	vector<int> out_request_addresses(numProcesses);
@@ -276,8 +276,8 @@ bool deltaSingleStep(long long base) {
 		}
 	}
 
-	auto in_vertex = shareWithAll(out_vertex, MPI_INT);
-	auto in_dist = shareWithAll(out_dist, MPI_LONG_LONG);
+	auto in_vertex = shareWithAll<int>(out_vertex, MPI_INT);
+	auto in_dist = shareWithAll<long long>(out_dist, MPI_LONG_LONG);
 
 	for(int rank = 0; rank < numProcesses; rank++) {
 		for(int i = 0; i < in_vertex.size(); i++) {
@@ -358,8 +358,8 @@ void deltaLongPhase(int base) {
 			}
 		}
 
-		auto in_vertex = shareWithAll(out_vertex, MPI_INT);
-		auto in_dist = shareWithAll(out_dist, MPI_LONG_LONG);
+		auto in_vertex = shareWithAll<int>(out_vertex, MPI_INT);
+		auto in_dist = shareWithAll<long long>(out_dist, MPI_LONG_LONG);
 
 		for(int rank = 0; rank < numProcesses; rank++) {
 			for(int i = 0; i < in_vertex.size(); i++) {
@@ -391,13 +391,13 @@ void deltaLongPhase(int base) {
 				// Probably useless if
 				else if (target.length + base < dist[src]) {
 					out_requests[target.destRank].insert(target.dest);
-					attributed_requests[target.destRank].emplace_back(src, target);
+					attributed_requests[target.destRank].emplace_back(src, target.length, target.dest);
 				} else {
 					err << "Fourth assumption wrong" << std::endl;
 				}
 			}
 		}
-		auto in_requests = shareWithAll(out_requests, MPI_INT);
+		auto in_requests = shareWithAll<int>(out_requests, MPI_INT);
 
 		vector<vector<int>> out_vertices(numProcesses);
 		vector<vector<long long>> out_lengths(numProcesses);
@@ -409,8 +409,8 @@ void deltaLongPhase(int base) {
 				}
 			}
 		}
-		auto in_vertices = shareWithAll(out_vertices, MPI_INT);
-		auto in_lengths = shareWithAll(out_lengths, MPI_LONG_LONG);
+		auto in_vertices = shareWithAll<int>(out_vertices, MPI_INT);
+		auto in_lengths = shareWithAll<long long>(out_lengths, MPI_LONG_LONG);
 
 		for(auto rank = 0; rank < numProcesses; rank++) {
 			unordered_map<int, long long> partial_outside;
