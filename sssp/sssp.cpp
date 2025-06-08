@@ -773,19 +773,7 @@ int main(int argc, char* argv[]) {
 	string changed_extension = std::regex_replace(in_path, ext, ".err");
 	string err_path = "error/" + std::regex_replace(changed_extension, sep, "--");
 
-	std::fstream err2;
-	std::stringstream s;
-	s << "error/" << myRank << ".err";
-	err2.open(s.str(), std::ios_base::out);
-
-	err2 << err_path << std::endl;
-
 	err.open(err_path, std::ios_base::out);
-
-	err2.close();
-	err.close();
-
-	exit(1);
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
