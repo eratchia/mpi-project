@@ -187,7 +187,6 @@ struct Target{
 	}
 };
 
-
 MPI_Comm intra_node_comm;
 int intraRank, intraNum;
 
@@ -244,11 +243,7 @@ bool deltaSingleStep(long long base) {
 	bool was_changed = false, global_changed = false;
 	unordered_set<int> new_active;
 
-	for(auto& v: *vertex_window_data) {
-		v = inf;
-	}
-
-	MPI_Win_fence(MPI_MODE_NOPRECEDE, vertex_window);
+	vector<unordered_map<int, long long>> best_update;
 
 	for(auto src: active) {
 		auto edges_begin = edges[src].begin();
@@ -274,37 +269,47 @@ bool deltaSingleStep(long long base) {
 					update_distance(target.dest, new_dist);
 				}
 			} else {
-				auto [destRank, destId] = outside_address[target.dest];
+				// auto [destRank, destId] = outside_address[target.dest];
 				non_phase_comms++;
-				MPI_Accumulate(
-					&new_dist, 
-					1, 
-					MPI_LONG_LONG, 
-					destRank, 
-					destId, 
-					1, 
-					MPI_LONG_LONG, 
-					MPI_MIN, 
-					vertex_window
-				);
+				auto it  = best_update[target.destRank].find(target.dest);
+				auto best = new_dist;
+				if (it != best_update[target.destRank].end()) {
+					best = min(it->second, new_dist);
+				}	
+				best_update[target.destRank][target.dest] = best;
 			}
 		}
 	}
 
-	MPI_Win_fence(MPI_MODE_NOSUCCEED, vertex_window);
+	vector<vector<int>> out_vertex(numProcesses);
+	vector<vector<long long>> out_dist(numProcesses);
+	
+	for(int rank = 0; rank < numProcesses; rank++) {
+		for(auto [dest, new_dist]: best_update[rank]) {
+			out_vertex[rank].push_back(dest);
+			out_dist[rank].push_back(new_dist);
+		}
+	}
 
-	for(auto src: unsettled) {
-		if (vertex_window_data[src] < dist[src]) {
-			// Possibly not useful if anymore
-			if (vertex_window_data[src] < base + delta) {
-				if (dist[src] >= base + delta) {
-					current_bucket.insert(src);
+	auto in_vertex = shareWithAll(out_vertex, MPI_INT);
+	auto in_dist = shareWithAll(out_dist, MPI_LONG_LONG);
+
+	for(int rank = 0; rank < numProcesses; rank++) {
+		for(int i = 0; i < in_vertex.size(); i++) {
+			auto dest = in_vertex[rank][i];
+			auto new_dist = in_dist[rank][i];
+			if (new_dist < dist[dest]) {
+				// Possibly not useful if anymore
+				if (new_dist < base + delta) {
+					if (dist[dest] >= base + delta) {
+						current_bucket.insert(dest);
+					}
+					new_active.insert(dest); 
+					was_changed = true;
 				}
-				new_active.insert(src); 
-				was_changed = true;
-			}
-			update_distance(src, vertex_window_data[src]);
-		}	
+				update_distance(dest, vertex_window_data[dest]);
+			}	
+		} 
 	}
 
 	MPI_Allreduce(
@@ -334,7 +339,7 @@ void deltaLongPhase(int base) {
 	}
 
 	if constexpr (classification && !pull) {
-		MPI_Win_fence(MPI_MODE_NOPRECEDE, vertex_window);
+		vector<unordered_map<int, long long>> best_update;
 
 		// Handle edges going out of the current bracket forward.
 		for(auto src: current_bucket) {
@@ -342,30 +347,39 @@ void deltaLongPhase(int base) {
 			auto edges_end = edges[src].end();
 			for(auto it = edges_begin; it != edges_end; it++) {
 				auto& target = *it;
-				auto [destRank, destId] = outside_address[target.dest];
 				auto new_dist = target.length + dist[src];
-				non_phase_comms++;
-				MPI_Accumulate(
-					&new_dist, 
-					1, 
-					MPI_LONG_LONG, 
-					destRank, 
-					destId, 
-					1, 
-					MPI_LONG_LONG, 
-					MPI_MIN, 
-					vertex_window
-				);
+
+				auto mit = best_update[target.destRank].find(target.dest);
+				auto best = new_dist;
+				if (mit != best_update[target.destRank].end()) {
+					best = min(mit->second, new_dist);
+				}	
+				best_update[target.destRank][target.dest] = best;
 			}
 		}
 
-		MPI_Win_fence(MPI_MODE_NOSUCCEED, vertex_window);
+		vector<vector<int>> out_vertex(numProcesses);
+		vector<vector<long long>> out_dist(numProcesses);
+	
+		for(int rank = 0; rank < numProcesses; rank++) {
+			for(auto [dest, new_dist]: best_update[rank]) {
+				out_vertex[rank].push_back(dest);
+				out_dist[rank].push_back(new_dist);
+			}
+		}
 
-		for(int src = start; src <= end; src++) {
-			if (vertex_window_data[src] < dist[src]) {
-				active.insert(src);
-				update_distance(src, vertex_window_data[src]);
-			}	
+		auto in_vertex = shareWithAll(out_vertex, MPI_INT);
+		auto in_dist = shareWithAll(out_dist, MPI_LONG_LONG);
+
+		for(int rank = 0; rank < numProcesses; rank++) {
+			for(int i = 0; i < in_vertex.size(); i++) {
+				auto dest = in_vertex[rank][i];
+				auto new_dist = in_dist[rank][i];
+				if (new_dist < dist[dest]) {
+					active.insert(dest); 
+					update_distance(dest, vertex_window_data[dest]);
+				}	
+			} 
 		}
 	} else if constexpr (pull) {
 		// Gather requests
