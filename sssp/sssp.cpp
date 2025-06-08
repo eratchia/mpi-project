@@ -204,6 +204,11 @@ unordered_set<int> unsettled;
 unordered_set<int> current_bucket;
 
 inline void update_distance(int src, long long new_dist) {
+	auto it = vertices_by_distance.find({dist[src], src});
+	if (it != vertices_by_distance.end()) {
+		err << "No vertex: " << src << " at distance: " << dist[src] << "while updating" << std::endl; 
+	}
+
 	vertices_by_distance.erase({dist[src], src});
 	dist[src] = new_dist;
 	vertices_by_distance.insert({new_dist, src});
@@ -217,7 +222,11 @@ void deltaEpochSetup(long long base) {
 	// Pick active vertices
 	while(vertices_by_distance.size() && vertices_by_distance.begin()->first < base + delta) {
 		auto x = *vertices_by_distance.begin();
-		assert(unsettled.find(x.second) != unsettled.end());
+
+		if (unsettled.find(x.second) != unsettled.end()) {
+			err << "vertex " << x.second << " at dist " << x.first << " in vertex by distance was not unsettled" << std::endl; 
+		}
+
 		active.insert(x.second); 
 		current_bucket.insert(x.second);
 		vertices_by_distance.erase(vertices_by_distance.begin());
@@ -239,14 +248,19 @@ bool deltaSingleStep(long long base) {
 	err << std::endl;
 
 	for(auto src: active) {
+		err << "\t\tCalculating vertex: " << src << std::endl;
 		auto edges_begin = edges[src].begin();
 		auto edges_end = edges[src].end();
 		if constexpr(classification) {
 			edges_begin = short_edges[src].begin();
 			edges_end = std::lower_bound(short_edges[src].begin(), short_edges[src].end(), Target::lower(base + delta - dist[src]));
 		}
+		if (edges_begin == edges_end) {
+			err << "\t\tNo short edges" << std::endl;
+		}
 		for(auto it = edges_begin; it != edges_end; it++) {
 			auto& target = *it;
+			err << "\t\tEdge to " << target.dest << " of length" << target.length << std::endl;
 			long long new_dist = dist[src] + target.length;
 			if (is_local(target.dest)) {
 				local_relaxations++;
