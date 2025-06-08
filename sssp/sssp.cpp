@@ -211,6 +211,8 @@ inline void update_distance(int src, long long new_dist) {
 
 
 void deltaEpochSetup(long long base) {
+	err << "Starting delta epoch setup " << std::endl;
+
 	current_bucket = {};
 	// Pick active vertices
 	while(vertices_by_distance.size() && vertices_by_distance.begin()->first < base + delta) {
@@ -224,7 +226,7 @@ void deltaEpochSetup(long long base) {
 
 template<bool classification, bool pull>
 bool deltaSingleStep(long long base) {
-	// err << "Starting delta single step with base: " << base << std::endl;
+	err << "\tStarting delta single step with base: " << base << std::endl;
 	bool was_changed = false, global_changed = false;
 	unordered_set<int> new_active;
 
@@ -313,6 +315,7 @@ bool deltaSingleStep(long long base) {
 
 template<bool pull>
 void deltaLongPhase(int base) {
+	err << " Delta Long Phase" << std::endl;
 	if constexpr (!pull) {
 		vector<unordered_map<int, long long>> best_update;
 
@@ -434,6 +437,7 @@ void deltaLongPhase(int base) {
 
 template <bool classification, bool pull>
 void deltaEpochEpilogue(int base) {
+	err << " Delta epilogue" << std::endl;
 	active = {};
 
 	for(auto src: current_bucket) {
@@ -448,6 +452,7 @@ void deltaEpochEpilogue(int base) {
 
 template <bool classification, bool pull>
 bool deltaEpoch() {
+	err << "Starting new epoch nr: " << phases << std::endl;
 	static_assert(!pull || classification, "pull model only available if classification is enables");
 	long long min_dist = inf, global_min_dist = inf;
 	if (!vertices_by_distance.empty()) {
