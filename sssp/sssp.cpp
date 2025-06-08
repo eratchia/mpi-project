@@ -26,12 +26,15 @@ long long delta = inf;
 
 constexpr bool sanity = true;
 constexpr bool debug = false;
+constexpr bool opt_delta = true;
 
 std::fstream err;
 
 int all_vert;
 int start, end;
 int length;
+
+long long max_len;
 
 int phases = 0, non_phase_steps = 0, local_relaxations = 0;
 
@@ -659,6 +662,20 @@ void setup() {
 		0,
 		MPI_COMM_WORLD
 	);
+
+	if constexpr (opt_delta) {
+		// Calculate optimal delta
+		int local_max = max_len;	
+		MPI_Allreduce(
+			&local_max,
+			&max_len,
+			1, MPI_LONG_LONG,
+			MPI_MAX,
+			MPI_COMM_WORLD
+		);
+		delta = std::min(10LL, max_len / 10);
+	}
+
 	// Calculate outside mapping
 	for(int src = start; src <= end; src++) {
 		for(auto& target: edges[src]) {
@@ -710,6 +727,7 @@ void read(string file) {
 	long long len;
 	while(in >> x) {
 		in >> y >> len;
+		max_len = std::max(max_len, len);
 		if (is_local(x)) {
 			edges[x].emplace_back(y, len);
 		}
