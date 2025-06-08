@@ -22,9 +22,9 @@ using std::min;
 
 constexpr long long inf = 5'000'000'000'000'000'000;
 static_assert(inf > 0, "Bad inf size");
-constexpr long long delta = inf;
-static_assert(delta > 0, "Bad delta size");
+long long delta = inf;
 
+constexpr bool sanity = true;
 constexpr bool debug = true;
 
 std::fstream err;
@@ -42,7 +42,7 @@ template<class T, typename S>
 vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype& mpi_type) {
 	constexpr bool local_debug = false;
 
-	if constexpr (local_debug && debug) {
+	if constexpr (local_debug) {
 		err << "[share with all]" << std::endl;
 	}
 	// setup out request information
@@ -60,7 +60,7 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		}
 		out_amounts[rank] = out_it - out_request_addresses[rank];
 	}
-	if constexpr (local_debug && debug) {
+	if constexpr (local_debug) {
 		err << "[out information set up]" << std::endl;
 	}
 
@@ -72,7 +72,7 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		1, MPI_INT, 
 		MPI_COMM_WORLD);
 
-	if constexpr (local_debug && debug) {
+	if constexpr (local_debug) {
 		err << "[request sizes sent]" << std::endl;
 	}
 
@@ -86,7 +86,7 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 	}
 	flat_in_requests.resize(sum);
 
-	if constexpr (local_debug && debug) {
+	if constexpr (local_debug) {
 		err << "[in information set up]" << std::endl;
 	}
 
@@ -102,7 +102,7 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		MPI_COMM_WORLD
 	);
 
-	if constexpr (local_debug && debug) {
+	if constexpr (local_debug) {
 		err << "[information sent]" << std::endl;
 
 		err << "[amounts: ";
@@ -132,7 +132,7 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		}
 	}
 
-	if constexpr (local_debug && debug) {
+	if constexpr (local_debug) {
 		err << "[result calculated]" << std::endl;
 	}
 	return in_requests;
@@ -243,14 +243,16 @@ unordered_set<int> active;
 LocalVector<vector<Target>> edges;
 LocalVector<vector<Target>> short_edges;
 LocalVector<long long> dist; ///< Local distances from 0
-LocalVector<bool> settled;
+int settled = 0;
 unordered_set<int> unsettled;
 unordered_set<int> current_bucket;
 
 inline void update_distance(int src, long long new_dist) {
-	auto it = vertices_by_distance.find({dist[src], src});
-	if (it == vertices_by_distance.end()) {
-		err << "<No vertex: " << src << " at distance: " << dist[src] << "while updating>" << std::endl; 
+	if constexpr (sanity) {
+		auto it = vertices_by_distance.find({dist[src], src});
+		if (it == vertices_by_distance.end()) {
+			err << "<No vertex: " << src << " at distance: " << dist[src] << "while updating>" << std::endl; 
+		}
 	}
 
 	vertices_by_distance.erase({dist[src], src});
@@ -260,15 +262,19 @@ inline void update_distance(int src, long long new_dist) {
 
 
 void deltaEpochSetup(long long base) {
-	err << " Starting delta epoch setup " << std::endl;
+	if constexpr(debug) {
+		err << " Starting delta epoch setup " << std::endl;
+	}
 
 	current_bucket = {};
 	// Pick active vertices
 	while(vertices_by_distance.size() && vertices_by_distance.begin()->first < base + delta) {
-		auto x = *vertices_by_distance.begin();
+		if constexpr(sanity) {
+			auto x = *vertices_by_distance.begin();
 
-		if (unsettled.find(x.second) == unsettled.end()) {
-			err << "<vertex " << x.second << " at dist " << x.first << " in vertex by distance was not unsettled>" << std::endl; 
+			if (unsettled.find(x.second) == unsettled.end()) {
+				err << "<vertex " << x.second << " at dist " << x.first << " in vertex by distance was not unsettled>" << std::endl; 
+			}
 		}
 
 		active.insert(x.second); 
@@ -279,46 +285,58 @@ void deltaEpochSetup(long long base) {
 
 template<bool classification, bool pull>
 bool deltaSingleStep(long long base) {
-	err << "\tStarting delta single step with base: " << base << std::endl;
+	if constexpr(debug) {
+		err << "\tStarting delta single step with base: " << base << std::endl;
+	}
 	bool was_changed = false, global_changed = false;
 	unordered_set<int> new_active;
 
 	vector<unordered_map<int, long long>> best_update(numProcesses);
 
-	err << "\tCurrently active: ";
-	for(auto src: active) {
-		err << src << " ";
+	if constexpr(debug) {
+		err << "\tCurrently active: ";
+		for(auto src: active) {
+			err << src << " ";
+		}
+		err << std::endl;
 	}
-	err << std::endl;
 
 	for(auto src: active) {
-		err << "\t\tCalculating vertex: " << src << std::endl;
+		if constexpr (debug) {
+			err << "\t\tCalculating vertex: " << src << std::endl;
+		}
 		auto edges_begin = edges[src].begin();
 		auto edges_end = edges[src].end();
 		if constexpr(classification) {
 			edges_begin = short_edges[src].begin();
 			edges_end = std::lower_bound(short_edges[src].begin(), short_edges[src].end(), Target::lower(base + delta - dist[src]));
 		}
-		if (edges_begin == edges_end) {
-			err << "\t\tNo short edges" << std::endl;
+		if constexpr (debug) {
+			if (edges_begin == edges_end) {
+				err << "\t\tNo short edges" << std::endl;
+			}
 		}
 		for(auto it = edges_begin; it != edges_end; it++) {
 			auto& target = *it;
-			err << "\t\tEdge to " << target.dest << " of length " << target.length << std::endl;
+			if constexpr (debug) {
+				err << "\t\tEdge to " << target.dest << " of length " << target.length << std::endl;
+			}
 			long long new_dist = dist[src] + target.length;
 			if (is_local(target.dest)) {
 				local_relaxations++;
 				if (new_dist < dist[target.dest]) {
-					// Possibly not useful if anymore
-					if (new_dist < base + delta) {
-						if (dist[target.dest] >= base + delta) {
-							current_bucket.insert(target.dest);
+
+					if constexpr (sanity) {
+						if (new_dist >= base + delta) {
+							err << "<<First assumption wrong>>" << std::endl;
 						}
-						new_active.insert(target.dest);
-						was_changed = true;
-					} else if constexpr (classification) {
-						err << "<<First assumption wrong>>" << std::endl;
 					}
+
+					if (dist[target.dest] >= base + delta) {
+						current_bucket.insert(target.dest);
+					}
+					new_active.insert(target.dest);
+					was_changed = true;
 					update_distance(target.dest, new_dist);
 				}
 			} else {
@@ -379,7 +397,9 @@ bool deltaSingleStep(long long base) {
 
 template<bool pull>
 void deltaLongPhase(int base) {
-	err << " Delta Long Phase" << std::endl;
+	if constexpr (debug) {
+		err << " Delta Long Phase" << std::endl;
+	}
 	if constexpr (!pull) {
 		vector<unordered_map<int, long long>> best_update(numProcesses);
 
@@ -393,15 +413,16 @@ void deltaLongPhase(int base) {
 				if (is_local(target.dest)) {
 					local_relaxations++;
 					if (new_dist < dist[target.dest]) {
-						// Possibly not useful if anymore
-						if (new_dist < base + delta) {
-							if (dist[target.dest] >= base + delta) {
-								current_bucket.insert(target.dest);
+						if constexpr (sanity) {
+							if (new_dist >= base + delta) {
+								err << "<<Second assumption wrong>>" << std::endl;
 							}
-							active.insert(target.dest);
-						} else {
-							err << "<<Second assumption wrong>>" << std::endl;
 						}
+
+						if (dist[target.dest] >= base + delta) {
+							current_bucket.insert(target.dest);
+						}
+						active.insert(target.dest);
 						update_distance(target.dest, new_dist);
 					}
 				} else {
@@ -454,13 +475,15 @@ void deltaLongPhase(int base) {
 						update_distance(src, dist[target.dest] + target.length);
 						active.insert(src);
 					}
-				}
-				// Probably useless if
-				else if (target.length + base < dist[src]) {
+				} else {
+					if constexpr (sanity) {
+						if (target.length + base >= dist[src]) {
+							err << "<<Third assumption wrong>>" << std::endl;
+						}
+					}
+
 					out_requests[target.destRank].insert(target.dest);
 					attributed_requests[target.destRank].emplace_back(src, target.length, target.dest);
-				} else {
-					err << "<<Third assumption wrong>>" << std::endl;
 				}
 			}
 		}
@@ -501,12 +524,14 @@ void deltaLongPhase(int base) {
 
 template <bool classification, bool pull>
 void deltaEpochEpilogue(int base) {
-	err << " Delta epilogue" << std::endl;
+	if constexpr(debug) {
+		err << " Delta epilogue" << std::endl;
+	}
 	active = {};
 
 	for(auto src: current_bucket) {
 		unsettled.erase(src);
-		settled[src] = true;
+		settled++;
 		vertices_by_distance.erase({dist[src], src});
 	}
 
@@ -515,10 +540,7 @@ void deltaEpochEpilogue(int base) {
 	}
 }
 
-template <bool classification, bool pull>
-bool deltaEpoch() {
-	err << "Starting new epoch nr: " << phases << std::endl;
-	static_assert(!pull || classification, "pull model only available if classification is enables");
+long long calc_min_dist() {
 	long long min_dist = inf, global_min_dist = inf;
 	if (!vertices_by_distance.empty()) {
 		min_dist = vertices_by_distance.begin()->first;
@@ -531,23 +553,68 @@ bool deltaEpoch() {
 		MPI_MIN, 
 		MPI_COMM_WORLD
 	);
-	if (global_min_dist == inf) return false;
 
-	deltaEpochSetup(global_min_dist);
+	return global_min_dist;
+}
+
+template <bool classification, bool pull>
+bool deltaEpoch() {
+	if constexpr (debug) {
+		err << "Starting new epoch nr: " << phases << std::endl;
+	}
+	static_assert(!pull || classification, "pull model only available if classification is enables");
+
+	long long base = calc_min_dist();
+
+	if (base == inf) return false;
+
+	deltaEpochSetup(base);
 
 	non_phase_steps++;
-	while(deltaSingleStep<classification, pull>(global_min_dist)) {
+	while(deltaSingleStep<classification, pull>(base)) {
 		non_phase_steps++;
 	}
 
-	deltaEpochEpilogue<classification, pull>(global_min_dist);
+	deltaEpochEpilogue<classification, pull>(base);
 
 	return true;
 }
 
+void runBellmanFord() {
+	auto base = calc_min_dist();
+	delta = inf - base;	
+
+	non_phase_steps++;
+	while(deltaEpoch<false, false>()) {
+		non_phase_steps++;
+	}
+}
+
+template<bool classification, bool pull, bool hybridize>
+void runDelta() {
+	phases++;
+	while(deltaEpoch<classification, pull>()) {
+		phases++;
+		if constexpr(hybridize) {
+			int all_settled;
+			MPI_Allreduce(
+				&settled, 
+				&all_settled, 
+				1, 
+				MPI_INT, 
+				MPI_SUM, 
+				MPI_COMM_WORLD
+			);
+			if (all_settled * 10 >= all_vert) {
+				runBellmanFord();
+				break;
+			}
+		}
+	}
+}
+
 void setup() {
 	dist->resize(length);
-	settled->resize(length);
 	ends.resize(numProcesses);
 	// Collect common start/end of vertices of each process
 	for(int src = start; src <= end; src++) {
@@ -630,7 +697,9 @@ void setup() {
 }
 
 void read(string file) {
-	err << "Reading input" << std::endl;
+	if constexpr (debug) {
+		err << "Reading input" << std::endl;
+	}
 	std::fstream in(file, std::ios_base::in);
 
 	in >> all_vert >> start >> end;
@@ -652,7 +721,9 @@ void read(string file) {
 		sort(edges[src].begin(), edges[src].end());
 	}
 	in.close();
-	err << "Finished reading input" << std::endl;
+	if constexpr (debug) {
+		err << "Finished reading input" << std::endl;
+	}
 }
 
 void write_out(string file) {
@@ -700,10 +771,7 @@ int main(int argc, char* argv[]) {
 	read(argv[1]);
 	setup();
 
-	phases++;
-	while(deltaEpoch<true, true>()) {
-		phases++;
-	}
+	runDelta<true, true, true>();
 
 	write_info();
 	write_out(argv[2]);
