@@ -54,6 +54,7 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		}
 		out_amounts[rank] = out_it - out_request_addresses[rank];
 	}
+	err << "[out information set up]" << std::endl;
 
 	// communicate request sizes
 	MPI_Alltoall(
@@ -62,6 +63,8 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		in_amounts.data(), 
 		1, MPI_INT, 
 		MPI_COMM_WORLD);
+
+	err << "[request sizes sent]" << std::endl;
 
 	// setup in request information
 	vector<T> flat_in_requests;
@@ -72,6 +75,8 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		sum += in_amounts[rank];
 	}
 	flat_in_requests.resize(sum);
+
+	err << "[in information set up]" << std::endl;
 
 	MPI_Alltoallv(
 		flat_out_requests.data(), 
@@ -85,6 +90,8 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		MPI_COMM_WORLD
 	);
 
+	err << "[information sent]" << std::endl;
+
 	vector<vector<T>> in_requests(numProcesses);
 	for(int rank = 0; rank < numProcesses; rank++) {
 		in_requests.resize(in_amounts[rank]);
@@ -92,6 +99,8 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 			in_requests[rank][i] = flat_in_requests[in_request_addresses[rank] + i];
 		}
 	}
+
+	err << "[result calculated]" << std::endl;
 	return in_requests;
 }
 
