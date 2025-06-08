@@ -56,8 +56,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	int x, y, len;
-	while(cin >> x) {
-		cin >> y;
+	while(in >> x) {
+		in >> y;
 		len = rand() % 256;
 		int x_p = whichProcess(x);
 		int y_p = whichProcess(y);
