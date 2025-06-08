@@ -92,6 +92,18 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 
 	err << "[information sent]" << std::endl;
 
+	err << "[amounts: ";
+	for(auto x: in_amounts) {
+		err << x << " ";
+	}
+	err << "]" << std::endl;
+
+	err << "[in_request_addresses: ";
+	for(auto x: in_request_addresses) {
+		err << x << " ";
+	}
+	err << "]" << std::endl;
+
 	err << "[";
 	for(auto x: flat_in_requests) {
 		err << x << " ";
