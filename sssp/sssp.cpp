@@ -427,7 +427,7 @@ void deltaLongPhase(int base) {
 					local_relaxations++;
 					if (new_dist < dist[target.dest]) {
 						if constexpr (sanity) {
-							if (new_dist >= base + delta) {
+							if (new_dist < base + delta) {
 								err << "<<Second assumption wrong>>" << std::endl;
 							}
 						}
