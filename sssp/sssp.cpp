@@ -41,6 +41,8 @@ int phases = 0, non_phase_steps = 0, local_relaxations = 0;
 int numProcesses;
 int myRank;
 
+double elapsed_time;
+
 template<class T, typename S>
 vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype& mpi_type) {
 	constexpr bool local_debug = false;
@@ -770,6 +772,7 @@ void write_info() {
 	err << "Number of phases: " << phases << std::endl;
 	err << "Number of non phase steps: " << non_phase_steps << std::endl;
 	err << "Local relaxations: " << local_relaxations << std::endl;
+	err << "Elapsed time: " << elapsed_time << "s" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -777,8 +780,6 @@ int main(int argc, char* argv[]) {
 		cerr << "Usage: " << string(argv[0]) << " input_file output_file"; 
 		return 1;
 	}
-
-
 
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
@@ -795,11 +796,16 @@ int main(int argc, char* argv[]) {
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-
 	read(argv[1]);
+	double start_time = MPI_Wtime();
+
 	setup();
 
 	runDelta<true, true, true>();
+
+	double end_time = MPI_Wtime();
+
+	elapsed_time = end_time - start_time;
 
 	write_info();
 	write_out(argv[2]);
