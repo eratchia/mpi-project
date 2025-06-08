@@ -40,7 +40,7 @@ int myRank;
 
 template<class T, typename S>
 vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype& mpi_type) {
-	constexpr bool local_debug = false;
+	constexpr bool local_debug = true;
 
 	if constexpr (local_debug && debug) {
 		err << "[share with all]" << std::endl;
