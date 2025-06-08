@@ -507,6 +507,7 @@ void deltaEpochEpilogue(int base) {
 	for(auto src: current_bucket) {
 		unsettled.erase(src);
 		settled[src] = true;
+		vertices_by_distance.erase({dist[src], src});
 	}
 
 	if constexpr (classification) {
