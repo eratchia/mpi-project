@@ -766,7 +766,7 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
-	const std::regex ext("[.]*");
+	const std::regex ext("[.].*$");
 	const std::regex sep("[/]");
 
 	string in_path = argv[1];
