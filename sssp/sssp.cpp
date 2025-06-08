@@ -25,9 +25,9 @@ static_assert(inf > 0, "Bad inf size");
 long long delta = inf;
 
 constexpr bool sanity = true;
-constexpr bool debug = true;
+constexpr bool debug = false;
 constexpr bool opt_delta = true;
-constexpr bool only_main = false;
+constexpr bool only_main = true;
 
 std::fstream err;
 
@@ -681,6 +681,9 @@ void setup() {
 			MPI_COMM_WORLD
 		);
 		delta = std::max(10LL, max_len / 10);
+		if (myRank == 0 || !only_main) {
+			err << "Delta " << delta << " was chosen" << std::endl;
+		}
 	}
 
 	// Calculate outside mapping
