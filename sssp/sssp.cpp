@@ -332,17 +332,24 @@ bool deltaSingleStep(long long base) {
 				local_relaxations++;
 				if (new_dist < dist[target.dest]) {
 
-					if constexpr (sanity) {
-						if (new_dist >= base + delta) {
-							err << "<<First assumption wrong>>" << std::endl;
+					if constexpr (classification) {
+						if constexpr (sanity) {
+							if (new_dist >= base + delta) {
+								err << "<<First assumption wrong>>" << std::endl;
+							}
 						}
+						if (dist[target.dest] >= base + delta) {
+							current_bucket.insert(target.dest);
+						}
+						new_active.insert(target.dest);
+						was_changed = true;
+					} else if (new_dist < base + delta) {
+						if (dist[target.dest] >= base + delta) {
+							current_bucket.insert(target.dest);
+						}
+						new_active.insert(target.dest);
+						was_changed = true;
 					}
-
-					if (dist[target.dest] >= base + delta) {
-						current_bucket.insert(target.dest);
-					}
-					new_active.insert(target.dest);
-					was_changed = true;
 					update_distance(target.dest, new_dist);
 				}
 			} else {
