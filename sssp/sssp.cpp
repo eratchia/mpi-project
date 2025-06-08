@@ -92,6 +92,12 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 
 	err << "[information sent]" << std::endl;
 
+	err << "[";
+	for(auto x: flat_in_requests) {
+		err << x << " ";
+	}
+	err << "]" << std::endl;
+
 	vector<vector<T>> in_requests(numProcesses);
 	for(int rank = 0; rank < numProcesses; rank++) {
 		in_requests.resize(in_amounts[rank]);
@@ -253,7 +259,7 @@ bool deltaSingleStep(long long base) {
 
 	err << "\tCurrently active: ";
 	for(auto src: active) {
-		err << src;
+		err << src << " ";
 	}
 	err << std::endl;
 
