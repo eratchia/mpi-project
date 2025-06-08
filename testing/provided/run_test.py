@@ -12,7 +12,7 @@ def run_test(break_on_fail, local, path_to_test):
         if break_on_fail:
             print(make.stdout)
             exit(1)
-        continue
+        exit(1)
     print(f"Solution: {solution.name}")
 
     test = path_to_test
@@ -31,7 +31,7 @@ def run_test(break_on_fail, local, path_to_test):
             print(f"{execution.stdout=}")
             print(f"{execution.stderr=}")
             exit(1)
-        continue
+        exit(1)
     failed = False
     for i in range(workers):
         if not filecmp.cmp(f"tests/{test.name}/{i}.out", f"outputs/{i}.out", shallow=False):
