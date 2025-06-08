@@ -926,7 +926,7 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
 	if (debug || (!only_main || myRank == 0)) {
-		const std::regex ext("[.].*$");
+		const std::regex ext("[.][^.]*$");
 		const std::regex sep("[/]");
 
 		string in_path = argv[1];
