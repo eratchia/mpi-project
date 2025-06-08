@@ -4,6 +4,7 @@
 #include <fstream>
 #include <cassert>
 #include <algorithm>
+#include <filesystem>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -760,13 +761,29 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
+
+
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
-	std::stringstream s;
-	s << "error/" << myRank << ".err";
-	err.open(s.str(), std::ios_base::out);
+	if (myRank == 0) {
+		std::filesystem::remove_all("error/");
+		std::filesystem::create_directory("error/");
+	}
+
+	std::filesystem::path in_path(argv[1]);
+	std::filesystem::path err_path("error/");
+	for(auto it = ++in_path.begin(); it != in_path.end(); it++) {
+		err_path /= *it;
+	}
+
+	std::filesystem::create_directories(err_path.parent_path());
+
+	err.open(err_path, std::ios_base::out);
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
 
 	read(argv[1]);
 	setup();
