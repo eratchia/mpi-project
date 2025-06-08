@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
 
 	string input_file = argv[2];
 	string test_dir = argv[3];
-	const regex getname("/[^/]*[.]");
+	const regex getname("/[^/]*(?=[.])");
 
 	smatch matched;
 	regex_search(input_file, matched, getname);
