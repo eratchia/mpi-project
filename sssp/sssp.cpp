@@ -25,9 +25,9 @@ static_assert(inf > 0, "Bad inf size");
 long long delta = inf;
 
 constexpr bool sanity = true;
-constexpr bool debug = false;
+constexpr bool debug = true;
 constexpr bool opt_delta = true;
-constexpr bool only_main = true;
+constexpr bool only_main = false;
 
 std::fstream err;
 
@@ -489,7 +489,7 @@ void deltaLongPhase(int base) {
 					}
 				} else {
 					if constexpr (sanity) {
-						if (target.length + base >= dist[src]) {
+						if (target.length + base < dist[src]) {
 							err << "<<Third assumption wrong>>" << std::endl;
 						}
 					}
@@ -575,7 +575,7 @@ bool deltaEpoch() {
 	if constexpr (debug) {
 		err << "Starting new epoch nr: " << phases << std::endl;
 	}
-	static_assert(!pull || classification, "pull model only available if classification is enables");
+	static_assert(!pull || classification, "pull model only available if classification is enabled");
 
 	long long base = calc_min_dist();
 
@@ -837,7 +837,7 @@ int main(int argc, char* argv[]) {
 
 	setup();
 
-	runDelta<true, false, true>();
+	runDelta<true, true, false>();
 
 	double end_time = MPI_Wtime();
 
