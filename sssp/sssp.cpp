@@ -773,6 +773,8 @@ int main(int argc, char* argv[]) {
 	string changed_extension = std::regex_replace(in_path, ext, ".err");
 	string err_path = "error/" + std::regex_replace(changed_extension, sep, "--");
 
+	std::cerr << err_path << std::endl;
+
 	err.open(err_path, std::ios_base::out);
 
 	MPI_Barrier(MPI_COMM_WORLD);
