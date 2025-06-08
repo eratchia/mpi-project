@@ -567,6 +567,7 @@ void setup() {
 }
 
 void read(string file) {
+	err << "Reading input" << std::endl;
 	std::fstream in(file, std::ios_base::in);
 
 	in >> all_vert >> start >> end;
@@ -585,6 +586,7 @@ void read(string file) {
 		sort(edges[src].begin(), edges[src].end());
 	}
 	in.close();
+	err << "Finished reading input" << std::endl;
 }
 
 void write_out(string file) {
