@@ -1,10 +1,8 @@
 #include <iostream>
-#include <sstream>
 #include <set>
 #include <fstream>
 #include <cassert>
 #include <algorithm>
-#include <filesystem>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -767,18 +765,7 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
-	if (myRank == 0) {
-		std::filesystem::remove_all("error/");
-		std::filesystem::create_directory("error/");
-	}
-
-	std::filesystem::path in_path(argv[1]);
-	std::filesystem::path err_path("error/");
-	for(auto it = ++in_path.begin(); it != in_path.end(); it++) {
-		err_path /= *it;
-	}
-
-	std::filesystem::create_directories(err_path.parent_path());
+	string err_path = "error/" + string(argv[1]);
 
 	err.open(err_path, std::ios_base::out);
 
