@@ -481,10 +481,8 @@ bool deltaEpoch() {
 }
 
 void setup() {
-	length = end - start + 1;
 	dist->resize(length);
 	settled->resize(length);
-	short_edges->resize(length);
 	ends.resize(numProcesses);
 	// Collect common start/end of vertices of each process
 	for(int src = start; src <= end; src++) {
@@ -571,6 +569,9 @@ void read(string file) {
 	std::fstream in(file, std::ios_base::in);
 
 	in >> all_vert >> start >> end;
+	length = end - start + 1;
+	edges->resize(length);
+	short_edges->resize(length);
 	int x, y;
 	long long len;
 	while(in >> x) {
