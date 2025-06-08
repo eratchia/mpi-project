@@ -31,7 +31,7 @@ int n;
 int start, end;
 int length;
 
-int phases = 0, non_phase_steps = 0, local_relaxations = 0, non_phase_comms = 0;
+int phases = 0, non_phase_steps = 0, local_relaxations = 0;
 
 int numProcesses;
 int myRank;
@@ -193,20 +193,15 @@ int intraRank, intraNum;
 int max_length;
 vector<int> ends; ///< The last vertices kept in each process
 
-// mapping from known outside vertices to their (process, local_id)
-unordered_map<int, pair<int, int>> outside_address;
 set<pair<long long, int>> vertices_by_distance;
 unordered_set<int> active;
 
 LocalVector<vector<Target>> edges(n);
 LocalVector<vector<Target>> short_edges(n);
-LocalVector<vector<Target>> long_edges(n);
 LocalVector<long long> dist; ///< Local distances from 0
 LocalVector<bool> settled;
 unordered_set<int> unsettled;
 unordered_set<int> current_bucket;
-// LocalVector<bool> changed;
-LocalVector<long long> vertex_window_data;
 
 inline void update_distance(int src, long long new_dist) {
 	vertices_by_distance.erase({dist[src], src});
@@ -214,27 +209,17 @@ inline void update_distance(int src, long long new_dist) {
 	vertices_by_distance.insert({new_dist, src});
 }
 
-vector<int> node_window_comm; 
-
-MPI_Win vertex_window;
-MPI_Win node_window;
 
 void deltaEpochSetup(long long base) {
 	current_bucket = {};
 	// Pick active vertices
 	while(vertices_by_distance.size() && vertices_by_distance.begin()->first < base + delta) {
 		auto x = *vertices_by_distance.begin();
+		assert(unsettled.find(x.second) != unsettled.end());
 		active.insert(x.second); 
 		current_bucket.insert(x.second);
 		vertices_by_distance.erase(vertices_by_distance.begin());
 	}
-	// for(auto src: vertices_by_distance) {
-		// if (dist[src] >= base && dist[src] < base + delta) {
-			// changed[src] = true;
-		// } else {
-			// changed[src] = false;
-		// }
-	// }
 }
 
 template<bool classification, bool pull>
@@ -265,12 +250,12 @@ bool deltaSingleStep(long long base) {
 						}
 						new_active.insert(target.dest);
 						was_changed = true;
+					} else if constexpr (classification) {
+						err << "First assumption wrong" << std::endl;
 					}
 					update_distance(target.dest, new_dist);
 				}
 			} else {
-				// auto [destRank, destId] = outside_address[target.dest];
-				non_phase_comms++;
 				auto it  = best_update[target.destRank].find(target.dest);
 				auto best = new_dist;
 				if (it != best_update[target.destRank].end()) {
@@ -307,7 +292,7 @@ bool deltaSingleStep(long long base) {
 					new_active.insert(dest); 
 					was_changed = true;
 				}
-				update_distance(dest, vertex_window_data[dest]);
+				update_distance(dest, new_dist);
 			}	
 		} 
 	}
@@ -326,19 +311,9 @@ bool deltaSingleStep(long long base) {
 	return global_changed;
 }
 
-template<bool classification, bool pull>
+template<bool pull>
 void deltaLongPhase(int base) {
-	for(auto& v: *vertex_window_data) {
-		v = inf;
-	}
-
-	active = {};
-
-	for(auto src: current_bucket) {
-		unsettled.erase(src);
-	}
-
-	if constexpr (classification && !pull) {
+	if constexpr (!pull) {
 		vector<unordered_map<int, long long>> best_update;
 
 		// Handle edges going out of the current bracket forward.
@@ -348,13 +323,28 @@ void deltaLongPhase(int base) {
 			for(auto it = edges_begin; it != edges_end; it++) {
 				auto& target = *it;
 				auto new_dist = target.length + dist[src];
-
-				auto mit = best_update[target.destRank].find(target.dest);
-				auto best = new_dist;
-				if (mit != best_update[target.destRank].end()) {
-					best = min(mit->second, new_dist);
-				}	
-				best_update[target.destRank][target.dest] = best;
+				if (is_local(target.dest)) {
+					local_relaxations++;
+					if (new_dist < dist[target.dest]) {
+						// Possibly not useful if anymore
+						if (new_dist < base + delta) {
+							if (dist[target.dest] >= base + delta) {
+								current_bucket.insert(target.dest);
+							}
+							active.insert(target.dest);
+						} else {
+							err << "Second assumption wrong" << std::endl;
+						}
+						update_distance(target.dest, new_dist);
+					}
+				} else {
+					auto mit = best_update[target.destRank].find(target.dest);
+					auto best = new_dist;
+					if (mit != best_update[target.destRank].end()) {
+						best = min(mit->second, new_dist);
+					}	
+					best_update[target.destRank][target.dest] = best;
+				}
 			}
 		}
 
@@ -377,11 +367,11 @@ void deltaLongPhase(int base) {
 				auto new_dist = in_dist[rank][i];
 				if (new_dist < dist[dest]) {
 					active.insert(dest); 
-					update_distance(dest, vertex_window_data[dest]);
+					update_distance(dest, new_dist);
 				}	
 			} 
 		}
-	} else if constexpr (pull) {
+	} else {
 		// Gather requests
 		vector<vector<tuple<int, long long, int>>> attributed_requests(numProcesses);
 		vector<set<int>> out_requests(numProcesses);
@@ -393,7 +383,6 @@ void deltaLongPhase(int base) {
 				auto& target = *it;
 				if (is_local(target.dest)) {
 					local_relaxations++;
-					// probably useless if
 					if (dist[target.dest] + target.length < dist[src]) {
 						update_distance(src, dist[target.dest] + target.length);
 						active.insert(src);
@@ -401,9 +390,10 @@ void deltaLongPhase(int base) {
 				}
 				// Probably useless if
 				else if (target.length + base < dist[src]) {
-					auto [destRank, destId] = outside_address[target.dest];
-					out_requests[destRank].insert(target.dest);
-					attributed_requests[destRank].emplace_back(src, target);
+					out_requests[target.destRank].insert(target.dest);
+					attributed_requests[target.destRank].emplace_back(src, target);
+				} else {
+					err << "Fourth assumption wrong" << std::endl;
 				}
 			}
 		}
@@ -444,15 +434,15 @@ void deltaLongPhase(int base) {
 
 template <bool classification, bool pull>
 void deltaEpochEpilogue(int base) {
+	active = {};
 
-	if constexpr (classification) {
-		deltaLongPhase<classification, pull>(base);
+	for(auto src: current_bucket) {
+		unsettled.erase(src);
+		settled[src] = true;
 	}
 
-	for(int src = start; src <= end; src++) {
-		if (dist[src] < base + delta) {
-			settled[src] = true;
-		}
+	if constexpr (classification) {
+		deltaLongPhase<pull>(base);
 	}
 }
 
@@ -460,8 +450,8 @@ template <bool classification, bool pull>
 bool deltaEpoch() {
 	static_assert(!pull || classification, "pull model only available if classification is enables");
 	long long min_dist = inf, global_min_dist = inf;
-	for(int src = start; src <= end; src++) {
-		if (!settled[src]) min_dist = min(min_dist, dist[src]);
+	if (!vertices_by_distance.empty()) {
+		min_dist = vertices_by_distance.begin()->first;
 	}
 	MPI_Allreduce(
 		&min_dist, 
@@ -485,85 +475,18 @@ bool deltaEpoch() {
 	return true;
 }
 
-// bool bellmanFordStep() {
-	// // err << "Starting bellman-ford in phase: " << phases << std::endl;
-	// LocalVector<bool> new_changed(length, false);
-	// bool was_changed = false;
-	// bool global_changed = false;
-
-	// for(auto& v: *vertex_window_data) {
-		// v = inf;
-	// }
-
-	// MPI_Win_fence(MPI_MODE_NOPRECEDE, vertex_window);
-
-	// for(int src = start; src <= end; src++) {
-		// if (changed[src]) {
-			// for(auto [dest, len]: edges[src]) {
-				// long long new_dist = dist[src] + len;
-				// if (is_local(dest)) {
-					// local_relaxations++;
-					// if (new_dist < dist[dest]) {
-						// dist[dest] = new_dist;
-						// new_changed[dest] = true;
-						// was_changed = true;
-					// }
-				// } else {
-					// auto [destRank, destId] = outside_address[dest];
-					// non_phase_comms++;
-					// MPI_Accumulate(
-						// &new_dist, 
-						// 1, 
-						// MPI_LONG_LONG, 
-						// destRank, 
-						// destId, 
-						// 1, 
-						// MPI_LONG_LONG, 
-						// MPI_MIN, 
-						// vertex_window
-					// );
-				// }
-			// }
-		// }
-	// }
-
-	// MPI_Win_fence(MPI_MODE_NOSUCCEED, vertex_window);
-
-	// for(int src = start; src <= end; src++) {
-		// if (vertex_window_data[src] < dist[src]) {
-			// dist[src] = vertex_window_data[src];
-			// new_changed[src] = true; 
-			// was_changed = true;
-		// }	
-	// }
-
-	// MPI_Allreduce(
-		// &was_changed, 
-		// &global_changed, 
-		// 1, 
-		// MPI_CXX_BOOL, 
-		// MPI_LOR, 
-		// MPI_COMM_WORLD
-	// );
-	// for(auto src = start; src <= end; src++) {
-		// changed[src] = new_changed[src];
-	// }
-
-	// return global_changed;
-// }
-
 void setup() {
 	length = end - start + 1;
 	dist->resize(length);
 	settled->resize(length);
 	short_edges->resize(length);
-	long_edges->resize(length);
-	active = {0};
 	ends.resize(numProcesses);
-	vertex_window_data->resize(length);
-	node_window_comm.resize(numProcesses);
 	// Collect common start/end of vertices of each process
+	for(int src = start; src <= end; src++) {
+		unsettled.insert(src);
+	}
 	if (myRank == 0) {
+		active = {0};
 		ends[0] = end;
 		for(int i = 1; i < numProcesses; i++) {
 			MPI_Recv(
@@ -614,8 +537,6 @@ void setup() {
 			}
 			if (target.length < delta) {
 				short_edges[src].push_back(target);
-			} else {
-				long_edges[src].push_back(target);
 			}
 		}
 	}
@@ -629,23 +550,6 @@ void setup() {
 	);
     MPI_Comm_size(intra_node_comm, &intraNum);
     MPI_Comm_rank(intra_node_comm, &intraRank);
-	// Setup window
-	MPI_Win_create(
-		vertex_window_data->data(), 
-		sizeof(long long) * length, 
-		sizeof(long long), 
-		MPI_INFO_NULL, 
-		MPI_COMM_WORLD, 
-		&vertex_window
-	);
-	MPI_Win_create(
-		&node_window_comm, 
-		sizeof(int) * length, 
-		sizeof(int), 
-		MPI_INFO_NULL, 
-		MPI_COMM_WORLD, 
-		&node_window
-	);
 	for(int src = start; src <= end; src++) {
 		dist[src] = inf;
 	}
@@ -669,19 +573,9 @@ void read(string file) {
 		in >> y >> len;
 		if (is_local(x)) {
 			edges[x].emplace_back(y, len);
-			if (len < delta) {
-				short_edges[x].emplace_back(y, len);
-			} else {
-				long_edges[x].emplace_back(y, len);
-			}
 		}
 		if (is_local(y)) {
 			edges[y].emplace_back(x, len);
-			if (len < delta) {
-				short_edges[y].emplace_back(x, len);
-			} else {
-				long_edges[y].emplace_back(x, len);
-			}
 		}
 	}
 	for(int src = start; src <= end; src++) {
@@ -709,21 +603,13 @@ void write_debug(string file) {
 		out << ends[i] << " ";
 	}
 	out << "\n";
-	for(auto [src, rest]: outside_address) {
-		out << src << " -> " << rest.first << ", " << rest.second << "\n";
-	}
 	out.close();
 }
 
 void write_info() {
 	err << "Number of phases: " << phases << std::endl;
 	err << "Number of non phase steps: " << non_phase_steps << std::endl;
-	err << "Non phase related communications: " << non_phase_comms << std::endl;
 	err << "Local relaxations: " << local_relaxations << std::endl;
-}
-
-void finish() {
-	MPI_Win_free(&vertex_window);
 }
 
 int main(int argc, char* argv[]) {
@@ -752,6 +638,4 @@ int main(int argc, char* argv[]) {
 	write_out(argv[2]);
 
 	err.close();
-
-	finish();
 }
