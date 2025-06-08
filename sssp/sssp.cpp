@@ -37,7 +37,7 @@ int length;
 
 long long max_len = 0;
 
-int phases = 0, non_phase_steps = 0, local_relaxations = 0;
+int phases = 0, non_phase_steps = 0, local_relaxations = 0, non_local_relaxations = 0;
 
 int numProcesses;
 int myRank;
@@ -380,6 +380,7 @@ bool deltaSingleStep(long long base) {
 		for(int i = 0; i < in_vertex[rank].size(); i++) {
 			auto dest = in_vertex[rank][i];
 			auto new_dist = in_dist[rank][i];
+			non_local_relaxations++;
 			if (new_dist < dist[dest]) {
 				// Possibly not useful if anymore
 				if (new_dist < base + delta) {
@@ -463,6 +464,7 @@ void deltaLongPhase(int base) {
 			for(int i = 0; i < in_vertex[rank].size(); i++) {
 				auto dest = in_vertex[rank][i];
 				auto new_dist = in_dist[rank][i];
+				non_local_relaxations++;
 				if (new_dist < dist[dest]) {
 					active.insert(dest); 
 					update_distance(dest, new_dist);
@@ -519,6 +521,7 @@ void deltaLongPhase(int base) {
 			}
 			for(auto [src, len, dest]: attributed_requests[rank]) {
 				auto it = partial_outside.find(dest);
+				non_local_relaxations++;
 				if (it != partial_outside.end()) {
 					auto new_dist = len + it->second;
 					if (new_dist < dist[src]) {
@@ -777,10 +780,19 @@ void write_debug(string file) {
 }
 
 void write_info() {
-	int global_relaxations;
+	int local_relaxations_sum;
 	MPI_Allreduce(
 		&local_relaxations, 
-		&global_relaxations, 
+		&local_relaxations_sum, 
+		1, MPI_INT, 
+		MPI_SUM, 
+		MPI_COMM_WORLD
+	);
+
+	int non_local_relaxations_sum;
+	MPI_Allreduce(
+		&non_local_relaxations, 
+		&non_local_relaxations_sum, 
 		1, MPI_INT, 
 		MPI_SUM, 
 		MPI_COMM_WORLD
@@ -790,7 +802,9 @@ void write_info() {
 		err << "Number of phases: " << phases << std::endl;
 		err << "Number of non phase steps: " << non_phase_steps << std::endl;
 		err << "Local relaxations in rank " << myRank << ": " << local_relaxations << std::endl;
-		err << "Local relaxations in summary: " << global_relaxations << std::endl;
+		err << "Local relaxations in summary: " << local_relaxations_sum << std::endl;
+		err << "Non Local relaxations in rank " << myRank << ": " << non_local_relaxations << std::endl;
+		err << "Non Local relaxations in summary: " << non_local_relaxations_sum << std::endl;
 		err << "Elapsed time: " << elapsed_time << "s" << std::endl;
 	}
 }
@@ -823,7 +837,7 @@ int main(int argc, char* argv[]) {
 
 	setup();
 
-	runDelta<true, false, false>();
+	runDelta<true, false, true>();
 
 	double end_time = MPI_Wtime();
 
