@@ -25,6 +25,8 @@ static_assert(inf > 0, "Bad inf size");
 constexpr long long delta = inf;
 static_assert(delta > 0, "Bad delta size");
 
+constexpr bool debug = true;
+
 std::fstream err;
 
 int all_vert;
@@ -38,7 +40,11 @@ int myRank;
 
 template<class T, typename S>
 vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype& mpi_type) {
-	err << "[share with all]" << std::endl;
+	constexpr bool local_debug = false;
+
+	if constexpr (local_debug && debug) {
+		err << "[share with all]" << std::endl;
+	}
 	// setup out request information
 	vector<T> flat_out_requests;
 	vector<int> out_request_addresses(numProcesses);
@@ -54,7 +60,9 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		}
 		out_amounts[rank] = out_it - out_request_addresses[rank];
 	}
-	err << "[out information set up]" << std::endl;
+	if constexpr (local_debug && debug) {
+		err << "[out information set up]" << std::endl;
+	}
 
 	// communicate request sizes
 	MPI_Alltoall(
@@ -64,7 +72,9 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		1, MPI_INT, 
 		MPI_COMM_WORLD);
 
-	err << "[request sizes sent]" << std::endl;
+	if constexpr (local_debug && debug) {
+		err << "[request sizes sent]" << std::endl;
+	}
 
 	// setup in request information
 	vector<T> flat_in_requests;
@@ -76,7 +86,9 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 	}
 	flat_in_requests.resize(sum);
 
-	err << "[in information set up]" << std::endl;
+	if constexpr (local_debug && debug) {
+		err << "[in information set up]" << std::endl;
+	}
 
 	MPI_Alltoallv(
 		flat_out_requests.data(), 
@@ -90,35 +102,39 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 		MPI_COMM_WORLD
 	);
 
-	err << "[information sent]" << std::endl;
+	if constexpr (local_debug && debug) {
+		err << "[information sent]" << std::endl;
 
-	err << "[amounts: ";
-	for(auto x: in_amounts) {
-		err << x << " ";
-	}
-	err << "]" << std::endl;
+		err << "[amounts: ";
+		for(auto x: in_amounts) {
+			err << x << " ";
+		}
+		err << "]" << std::endl;
 
-	err << "[in_request_addresses: ";
-	for(auto x: in_request_addresses) {
-		err << x << " ";
-	}
-	err << "]" << std::endl;
+		err << "[in_request_addresses: ";
+		for(auto x: in_request_addresses) {
+			err << x << " ";
+		}
+		err << "]" << std::endl;
 
-	err << "[";
-	for(auto x: flat_in_requests) {
-		err << x << " ";
+		err << "[";
+		for(auto x: flat_in_requests) {
+			err << x << " ";
+		}
+		err << "]" << std::endl;
 	}
-	err << "]" << std::endl;
 
 	vector<vector<T>> in_requests(numProcesses);
 	for(int rank = 0; rank < numProcesses; rank++) {
-		in_requests.resize(in_amounts[rank]);
+		in_requests[rank].resize(in_amounts[rank]);
 		for(int i = 0; i < in_amounts[rank]; i++) {
 			in_requests[rank][i] = flat_in_requests[in_request_addresses[rank] + i];
 		}
 	}
 
-	err << "[result calculated]" << std::endl;
+	if constexpr (local_debug && debug) {
+		err << "[result calculated]" << std::endl;
+	}
 	return in_requests;
 }
 
