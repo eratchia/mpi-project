@@ -269,9 +269,9 @@ void deltaEpochSetup(long long base) {
 	current_bucket = {};
 	// Pick active vertices
 	while(vertices_by_distance.size() && vertices_by_distance.begin()->first < base + delta) {
-		if constexpr(sanity) {
-			auto x = *vertices_by_distance.begin();
+		auto x = *vertices_by_distance.begin();
 
+		if constexpr(sanity) {
 			if (unsettled.find(x.second) == unsettled.end()) {
 				err << "<vertex " << x.second << " at dist " << x.first << " in vertex by distance was not unsettled>" << std::endl; 
 			}
