@@ -27,6 +27,7 @@ long long delta = inf;
 constexpr bool sanity = true;
 constexpr bool debug = false;
 constexpr bool opt_delta = true;
+constexpr bool only_main = true;
 
 std::fstream err;
 
@@ -769,10 +770,22 @@ void write_debug(string file) {
 }
 
 void write_info() {
-	err << "Number of phases: " << phases << std::endl;
-	err << "Number of non phase steps: " << non_phase_steps << std::endl;
-	err << "Local relaxations: " << local_relaxations << std::endl;
-	err << "Elapsed time: " << elapsed_time << "s" << std::endl;
+	int global_relaxations;
+	MPI_Allreduce(
+		&local_relaxations, 
+		&global_relaxations, 
+		1, MPI_INT, 
+		MPI_SUM, 
+		MPI_COMM_WORLD
+	);
+
+	if (debug || (!only_main || myRank == 0)) {
+		err << "Number of phases: " << phases << std::endl;
+		err << "Number of non phase steps: " << non_phase_steps << std::endl;
+		err << "Local relaxations in rank " << myRank << ": " << local_relaxations << std::endl;
+		err << "Local relaxations in summary " << global_relaxations << std::endl;
+		err << "Elapsed time: " << elapsed_time << "s" << std::endl;
+	}
 }
 
 int main(int argc, char* argv[]) {
@@ -785,14 +798,16 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
-	const std::regex ext("[.].*$");
-	const std::regex sep("[/]");
+	if (debug || (!only_main || myRank == 0)) {
+		const std::regex ext("[.].*$");
+		const std::regex sep("[/]");
 
-	string in_path = argv[1];
-	string changed_extension = std::regex_replace(in_path, ext, ".err");
-	string err_path = "error/" + std::regex_replace(changed_extension, sep, "--");
+		string in_path = argv[1];
+		string changed_extension = std::regex_replace(in_path, ext, ".err");
+		string err_path = "error/" + std::regex_replace(changed_extension, sep, "--");
 
-	err.open(err_path, std::ios_base::out);
+		err.open(err_path, std::ios_base::out);
+	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
@@ -810,5 +825,7 @@ int main(int argc, char* argv[]) {
 	write_info();
 	write_out(argv[2]);
 
-	err.close();
+	if (debug || (!only_main || myRank == 0)) {
+		err.close();
+	}
 }
