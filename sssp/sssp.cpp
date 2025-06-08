@@ -519,7 +519,6 @@ void deltaLongPhase(int base) {
 				if (it != partial_outside.end()) {
 					auto new_dist = len + it->second;
 					if (new_dist < dist[src]) {
-						dist[src] = new_dist;
 						update_distance(src, new_dist);
 						active.insert(src);
 					}
