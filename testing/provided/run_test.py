@@ -5,7 +5,7 @@ import filecmp
 
 def run_test(break_on_fail, local, path_to_test):
     Path("outputs").mkdir(parents=True, exist_ok=True)
-    solution = "aw429669"
+    solution = Path("aw429669")
     make = subprocess.run("make", cwd=solution.name, capture_output=True, timeout=300)
     if make.returncode != 0:
         print(f"{solution.name}: FAILED (make)")
@@ -15,7 +15,7 @@ def run_test(break_on_fail, local, path_to_test):
         exit(1)
     print(f"Solution: {solution.name}")
 
-    test = path_to_test
+    test = Path(path_to_test)
     workers = int(test.name[test.name.rfind("_") + 1:])
     # Remove old outputs
     for f in Path("outputs").iterdir():
