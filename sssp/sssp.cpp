@@ -46,7 +46,7 @@ vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype
 	vector<int> out_amounts(numProcesses, 0);
 	vector<int> in_amounts(numProcesses, 0);
 	int out_it = 0;
-	for(int rank = 0; rank <= numProcesses; rank++) {
+	for(int rank = 0; rank < numProcesses; rank++) {
 		out_request_addresses[rank] = out_it;
 		for(auto req: out_requests[rank]) {
 			flat_out_requests.push_back(req);
