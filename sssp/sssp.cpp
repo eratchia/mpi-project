@@ -35,7 +35,7 @@ int all_vert;
 int start, end;
 int length;
 
-long long max_len;
+long long max_len = 0;
 
 int phases = 0, non_phase_steps = 0, local_relaxations = 0;
 
@@ -274,7 +274,8 @@ void deltaEpochSetup(long long base) {
 
 	current_bucket = {};
 	// Pick active vertices
-	while(vertices_by_distance.size() && vertices_by_distance.begin()->first < base + delta) {
+	auto x = vertices_by_distance.begin();
+	while(x != vertices_by_distance.end() && x->first < base + delta) {
 		auto x = *vertices_by_distance.begin();
 
 		if constexpr(sanity) {
@@ -285,7 +286,6 @@ void deltaEpochSetup(long long base) {
 
 		active.insert(x.second); 
 		current_bucket.insert(x.second);
-		vertices_by_distance.erase(vertices_by_distance.begin());
 	}
 }
 
@@ -675,7 +675,7 @@ void setup() {
 
 	if constexpr (opt_delta) {
 		// Calculate optimal delta
-		int local_max = max_len;	
+		long long local_max = max_len;	
 		MPI_Allreduce(
 			&local_max,
 			&max_len,
@@ -683,7 +683,7 @@ void setup() {
 			MPI_MAX,
 			MPI_COMM_WORLD
 		);
-		delta = std::min(10LL, max_len / 10);
+		delta = std::max(10LL, max_len / 10);
 	}
 
 	// Calculate outside mapping
