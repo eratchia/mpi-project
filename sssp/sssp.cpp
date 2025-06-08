@@ -25,9 +25,9 @@ static_assert(inf > 0, "Bad inf size");
 long long delta = inf;
 
 constexpr bool sanity = true;
-constexpr bool debug = true;
+constexpr bool debug = false;
 constexpr bool opt_delta = true;
-constexpr bool only_main = false;
+constexpr bool only_main = true;
 
 std::fstream err;
 
