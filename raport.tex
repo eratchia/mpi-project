@@ -46,7 +46,7 @@
 In my solution I implemented all the optimizations with the exclusion of load balancing.
 
 \section{Performance testing}
-All the performance tests were run 3 times per size with average time calculated. The graphs used were from the $RMAT-1$ family with weights selected independently at random from range $[0, 255]$ (Same as in the paper). The tests are based on weak scaling with vertices per node fixed at $1000 000$ (So about $40 000$ per process) on up to $32$ nodes. The graphs were generated using code written here: \url{https://github.com/farkhor/PaRMAT}.
+All the performance tests were run 3 times per size with average time calculated. The graphs used were from the $RMAT-1$ family with weights selected independently at random from range $[0, 255]$ (Same as in the paper). The tests are based on weak scaling with vertices per node fixed at $1000 000$ (So about $40 000$ per process) on up to $32$ nodes. The graphs were generated using code written here: \url{https://github.com/farkhor/PaRMAT}. The generated graphs could have disconnected components but statistically they shouldn't be large.
 }
 
 \end{document}
