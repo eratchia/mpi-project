@@ -24,7 +24,7 @@ def run_test(break_on_fail, local, path_to_test, workers):
         command = "mpiexec"
     else:
         command = "srun"
-    execution = subprocess.run([command, "-n", str(workers), "./test_command.sh", solution.name, test.name], capture_output=True, timeout=300)
+    execution = subprocess.run([command, "-n", str(workers), "./perf_command.sh", solution.name, test.relative_to(Path("."))], capture_output=True, timeout=300)
     if execution.returncode != 0:
         print(f"    {test.name}: FAILED (srun)")
         if break_on_fail:
