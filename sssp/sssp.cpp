@@ -458,7 +458,7 @@ void deltaLongPhase(int base) {
 			MPI_SUM, 
 			MPI_COMM_WORLD
 		);
-		take_pull = diff > 0;
+		take_pull = all_diff > 0;
 	}
 	if (!take_pull) {
 		vector<unordered_map<int, long long>> best_update(numProcesses);

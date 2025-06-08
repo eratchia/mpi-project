@@ -1,4 +1,6 @@
 bin
+raport.*
 .*
 !.gitignore
+!raport.tex
 aw429669.zip

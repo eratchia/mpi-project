@@ -1,0 +1,52 @@
+\documentclass[a4paper,13pt,nontitlepage,onecolumn]{mwart}
+\usepackage[left=2cm,top=3cm,right=2cm,bottom=2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[MeX]{polski}
+\usepackage[utf8]{inputenc}
+\usepackage{amssymb, amsmath}
+\usepackage{pifont}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{enumerate}
+\usepackage{changepage}
+\usepackage{wasysym}
+\usepackage{verbatim}
+\usepackage{centernot}
+\usepackage{tikz}
+\usepackage{multicol}
+\usepackage{setspace}
+\usepackage{semantic}
+\renewcommand{\labelitemi}{$\bullet$}
+\setlength{\columnsep}{1.8cm}
+\pagestyle{empty}
+\setlength\parindent{0pt}
+
+\newcommand{\RR}{\mathbb{R}}
+\newcommand{\ZZ}{\mathbb{Z}}
+\newcommand{\NN}{\mathbb{N}}
+\newcommand{\CC}{\mathbb{C}}
+\newcommand{\KK}{\mathbb{K}}
+\newcommand{\QQ}{\mathbb{Q}}
+\newcommand{\PP}{\mathbb{P}}
+\newcommand{\XX}{\mathbb{X}}
+\newcommand{\btab}{\begin{adjustwidth}{5mm}{0mm}}
+\newcommand{\etab}{\end{adjustwidth}}
+
+\newcommand{\lb}{\left\lbrace}
+\newcommand{\rb}{\right\rbrace}
+
+\begin{document}
+\Large\textbf{Raport SSSP}\\
+\large{Antoni Wiśniewski}\\
+\large{\today}
+
+\large{
+\vspace{.5cm}
+\section{Description of solution}
+In my solution I implemented all the optimizations with the exclusion of load balancing.
+
+\section{Performance testing}
+All the performance tests were run 3 times per size with average time calculated. The graphs used were from the $RMAT-1$ family with weights selected independently at random from range $[0, 255]$ (Same as in the paper). The tests are based on weak scaling with vertices per node fixed at $1000 000$ (So about $40 000$ per process) on up to $32$ nodes. The graphs were generated using code written here: \url{https://github.com/farkhor/PaRMAT}.
+}
+
+\end{document}
