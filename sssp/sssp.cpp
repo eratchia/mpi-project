@@ -928,10 +928,12 @@ int main(int argc, char* argv[]) {
 	if (debug || (!only_main || myRank == 0)) {
 		const std::regex ext("[.][^.]*$");
 		const std::regex sep("[/]");
+		const std::regex dot("[.]");
 
 		string in_path = argv[1];
-		string changed_extension = std::regex_replace(in_path, ext, ".err");
-		string err_path = "error/" + std::regex_replace(changed_extension, sep, "--");
+		string changed_extension = std::regex_replace(in_path, ext, "");
+		string removed_dots = std::regex_replace(changed_extension, dot, "x");
+		string err_path = "error/" + std::regex_replace(removed_dots, sep, "--") + ".err";
 
 		err.open(err_path, std::ios_base::out);
 	}
