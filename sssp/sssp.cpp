@@ -27,7 +27,7 @@ static_assert(delta > 0, "Bad delta size");
 
 std::fstream err;
 
-int n;
+int all_vert;
 int start, end;
 int length;
 
@@ -196,8 +196,8 @@ vector<int> ends; ///< The last vertices kept in each process
 set<pair<long long, int>> vertices_by_distance;
 unordered_set<int> active;
 
-LocalVector<vector<Target>> edges(n);
-LocalVector<vector<Target>> short_edges(n);
+LocalVector<vector<Target>> edges;
+LocalVector<vector<Target>> short_edges;
 LocalVector<long long> dist; ///< Local distances from 0
 LocalVector<bool> settled;
 unordered_set<int> unsettled;
@@ -230,7 +230,7 @@ bool deltaSingleStep(long long base) {
 	bool was_changed = false, global_changed = false;
 	unordered_set<int> new_active;
 
-	vector<unordered_map<int, long long>> best_update;
+	vector<unordered_map<int, long long>> best_update(numProcesses);
 
 	for(auto src: active) {
 		auto edges_begin = edges[src].begin();
@@ -317,7 +317,7 @@ template<bool pull>
 void deltaLongPhase(int base) {
 	err << " Delta Long Phase" << std::endl;
 	if constexpr (!pull) {
-		vector<unordered_map<int, long long>> best_update;
+		vector<unordered_map<int, long long>> best_update(numProcesses);
 
 		// Handle edges going out of the current bracket forward.
 		for(auto src: current_bucket) {
@@ -569,9 +569,7 @@ void setup() {
 void read(string file) {
 	std::fstream in(file, std::ios_base::in);
 
-	in >> n >> start >> end;
-	edges->resize(n);
-	short_edges->resize(n);
+	in >> all_vert >> start >> end;
 	int x, y;
 	long long len;
 	while(in >> x) {
