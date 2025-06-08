@@ -38,6 +38,7 @@ int myRank;
 
 template<class T, typename S>
 vector<vector<T>> shareWithAll(const vector<S>& out_requests, const MPI_Datatype& mpi_type) {
+	err << "[share with all]" << std::endl;
 	// setup out request information
 	vector<T> flat_out_requests;
 	vector<int> out_request_addresses(numProcesses);
@@ -205,8 +206,8 @@ unordered_set<int> current_bucket;
 
 inline void update_distance(int src, long long new_dist) {
 	auto it = vertices_by_distance.find({dist[src], src});
-	if (it != vertices_by_distance.end()) {
-		err << "No vertex: " << src << " at distance: " << dist[src] << "while updating" << std::endl; 
+	if (it == vertices_by_distance.end()) {
+		err << "<No vertex: " << src << " at distance: " << dist[src] << "while updating>" << std::endl; 
 	}
 
 	vertices_by_distance.erase({dist[src], src});
@@ -223,8 +224,8 @@ void deltaEpochSetup(long long base) {
 	while(vertices_by_distance.size() && vertices_by_distance.begin()->first < base + delta) {
 		auto x = *vertices_by_distance.begin();
 
-		if (unsettled.find(x.second) != unsettled.end()) {
-			err << "vertex " << x.second << " at dist " << x.first << " in vertex by distance was not unsettled" << std::endl; 
+		if (unsettled.find(x.second) == unsettled.end()) {
+			err << "<vertex " << x.second << " at dist " << x.first << " in vertex by distance was not unsettled>" << std::endl; 
 		}
 
 		active.insert(x.second); 
@@ -260,7 +261,7 @@ bool deltaSingleStep(long long base) {
 		}
 		for(auto it = edges_begin; it != edges_end; it++) {
 			auto& target = *it;
-			err << "\t\tEdge to " << target.dest << " of length" << target.length << std::endl;
+			err << "\t\tEdge to " << target.dest << " of length " << target.length << std::endl;
 			long long new_dist = dist[src] + target.length;
 			if (is_local(target.dest)) {
 				local_relaxations++;
@@ -273,7 +274,7 @@ bool deltaSingleStep(long long base) {
 						new_active.insert(target.dest);
 						was_changed = true;
 					} else if constexpr (classification) {
-						err << "First assumption wrong" << std::endl;
+						err << "<<First assumption wrong>>" << std::endl;
 					}
 					update_distance(target.dest, new_dist);
 				}
@@ -356,7 +357,7 @@ void deltaLongPhase(int base) {
 							}
 							active.insert(target.dest);
 						} else {
-							err << "Second assumption wrong" << std::endl;
+							err << "<<Second assumption wrong>>" << std::endl;
 						}
 						update_distance(target.dest, new_dist);
 					}
@@ -416,7 +417,7 @@ void deltaLongPhase(int base) {
 					out_requests[target.destRank].insert(target.dest);
 					attributed_requests[target.destRank].emplace_back(src, target.length, target.dest);
 				} else {
-					err << "Fourth assumption wrong" << std::endl;
+					err << "<<Third assumption wrong>>" << std::endl;
 				}
 			}
 		}
