@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <regex>
 #include "mpi.h"
 
 using std::cerr;
@@ -765,7 +766,12 @@ int main(int argc, char* argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
-	string err_path = "error/" + string(argv[1]);
+	const std::regex ext("[.]*");
+	const std::regex sep("[/]");
+
+	string in_path = argv[1];
+	string changed_extension = std::regex_replace(in_path, ext, ".err");
+	string err_path = "error/" + std::regex_replace(changed_extension, sep, "--");
 
 	err.open(err_path, std::ios_base::out);
 
