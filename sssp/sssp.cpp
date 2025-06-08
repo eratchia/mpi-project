@@ -487,13 +487,7 @@ void deltaLongPhase(int base) {
 						update_distance(src, dist[target.dest] + target.length);
 						active.insert(src);
 					}
-				} else {
-					if constexpr (sanity) {
-						if (target.length + base < dist[src]) {
-							err << "<<Third assumption wrong>>" << std::endl;
-						}
-					}
-
+				} else if (target.length + base < dist[src]) {
 					out_requests[target.destRank].insert(target.dest);
 					attributed_requests[target.destRank].emplace_back(src, target.length, target.dest);
 				}
