@@ -211,7 +211,7 @@ inline void update_distance(int src, long long new_dist) {
 
 
 void deltaEpochSetup(long long base) {
-	err << "Starting delta epoch setup " << std::endl;
+	err << " Starting delta epoch setup " << std::endl;
 
 	current_bucket = {};
 	// Pick active vertices
@@ -231,6 +231,12 @@ bool deltaSingleStep(long long base) {
 	unordered_set<int> new_active;
 
 	vector<unordered_map<int, long long>> best_update(numProcesses);
+
+	err << "\tCurrently active: ";
+	for(auto src: active) {
+		err << src;
+	}
+	err << std::endl;
 
 	for(auto src: active) {
 		auto edges_begin = edges[src].begin();
