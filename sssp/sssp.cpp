@@ -29,6 +29,8 @@ constexpr bool debug = false;
 constexpr bool opt_delta = true;
 constexpr bool only_main = true;
 
+constexpr bool simple_short_long = true;
+
 std::fstream err;
 
 int all_vert;
@@ -248,6 +250,7 @@ unordered_set<int> active;
 
 LocalVector<vector<Target>> edges;
 LocalVector<vector<Target>> short_edges;
+LocalVector<vector<Target>> long_edges;
 LocalVector<long long> dist; ///< Local distances from 0
 int settled = 0;
 unordered_set<int> unsettled;
@@ -314,8 +317,13 @@ bool deltaSingleStep(long long base) {
 		auto edges_begin = edges[src].begin();
 		auto edges_end = edges[src].end();
 		if constexpr(classification) {
-			edges_begin = short_edges[src].begin();
-			edges_end = std::lower_bound(short_edges[src].begin(), short_edges[src].end(), Target::lower(base + delta - dist[src]));
+			if constexpr (simple_short_long) {
+				edges_begin = short_edges[src].begin();
+				edges_end = short_edges[src].end();
+			} else {
+				edges_begin = short_edges[src].begin();
+				edges_end = std::lower_bound(short_edges[src].begin(), short_edges[src].end(), Target::lower(base + delta - dist[src]));
+			}
 		}
 		if constexpr (debug) {
 			if (edges_begin == edges_end) {
@@ -331,8 +339,7 @@ bool deltaSingleStep(long long base) {
 			if (is_local(target.dest)) {
 				local_relaxations++;
 				if (new_dist < dist[target.dest]) {
-
-					if constexpr (classification) {
+					if constexpr (classification && !simple_short_long) {
 						if constexpr (sanity) {
 							if (new_dist >= base + delta) {
 								err << "<<First assumption wrong>>" << std::endl;
@@ -382,12 +389,22 @@ bool deltaSingleStep(long long base) {
 			auto new_dist = in_dist[rank][i];
 			non_local_relaxations++;
 			if (new_dist < dist[dest]) {
-				// Possibly not useful if anymore
-				if (new_dist < base + delta) {
+				if constexpr (classification && !simple_short_long) {
+					if constexpr (sanity) {
+						if (new_dist >= base + delta) {
+							err << "<<Fifth assumption wrong>>" << std::endl;
+						}
+					}
 					if (dist[dest] >= base + delta) {
 						current_bucket.insert(dest);
 					}
-					new_active.insert(dest); 
+					new_active.insert(dest);
+					was_changed = true;
+				} else if (new_dist < base + delta) {
+					if (dist[dest] >= base + delta) {
+						current_bucket.insert(dest);
+					}
+					new_active.insert(dest);
 					was_changed = true;
 				}
 				update_distance(dest, new_dist);
@@ -409,18 +426,42 @@ bool deltaSingleStep(long long base) {
 	return global_changed;
 }
 
-template<bool pull>
+template<bool pull, bool push_pull>
 void deltaLongPhase(int base) {
+	bool take_pull = pull;
 	if constexpr (debug) {
 		err << " Delta Long Phase" << std::endl;
 	}
-	if constexpr (!pull) {
+	if constexpr (push_pull) {
+		long long push_volume = 0, pull_volume = 0;	
+		for(auto src: current_bucket) {
+			if constexpr (simple_short_long) {
+				push_volume	+= long_edges[src].size();
+			} else {
+				auto first_long = std::lower_bound(edges[src].begin(), edges[src].end(), Target::lower(base + delta - dist[src]));
+				push_volume += (edges[src].end() - first_long);
+
+				first_long = std::lower_bound(short_edges[src].begin(), short_edges[src].end(), Target::lower(base + delta - dist[src]));
+				pull_volume += (short_edges[src].end() - first_long);
+			}
+		}
+		for(auto src: unsettled) {
+			auto first_too_long = std::lower_bound(long_edges[src].begin(), long_edges[src].end(), Target::lower(dist[src] - base));
+			pull_volume += (first_too_long - long_edges[src].begin());
+		}
+		take_pull = pull_volume < push_volume;
+	}
+	if (!take_pull) {
 		vector<unordered_map<int, long long>> best_update(numProcesses);
 
 		// Handle edges going out of the current bracket forward.
 		for(auto src: current_bucket) {
-			auto edges_begin = std::lower_bound(edges[src].begin(), edges[src].end(), Target::lower(base + delta - dist[src]));
-			auto edges_end = edges[src].end();
+			auto edges_begin = long_edges[src].begin();
+			auto edges_end = long_edges[src].end();
+			if constexpr (!simple_short_long) {
+				edges_begin = std::lower_bound(edges[src].begin(), edges[src].end(), Target::lower(base + delta - dist[src]));
+				edges_end = edges[src].end();
+			}
 			for(auto it = edges_begin; it != edges_end; it++) {
 				auto& target = *it;
 				auto new_dist = target.length + dist[src];
@@ -435,7 +476,7 @@ void deltaLongPhase(int base) {
 
 						active.insert(target.dest);
 						update_distance(target.dest, new_dist);
-					}
+					} 
 				} else {
 					auto mit = best_update[target.destRank].find(target.dest);
 					auto best = new_dist;
@@ -472,12 +513,72 @@ void deltaLongPhase(int base) {
 			} 
 		}
 	} else {
+		// First push short outgoing that can change something outside the bucket
+		if (!simple_short_long) {
+			vector<unordered_map<int, long long>> best_update(numProcesses);
+
+			// Handle edges going out of the current bracket forward.
+			for(auto src: current_bucket) {
+				auto edges_begin = std::lower_bound(short_edges[src].begin(), short_edges[src].end(), Target::lower(base + delta - dist[src]));
+				auto edges_end = short_edges[src].end();
+				for(auto it = edges_begin; it != edges_end; it++) {
+					auto& target = *it;
+					auto new_dist = target.length + dist[src];
+					if (is_local(target.dest)) {
+						local_relaxations++;
+						if (new_dist < dist[target.dest]) {
+							if constexpr (sanity) {
+								if (new_dist < base + delta) {
+									err << "<<Second assumption wrong>>" << std::endl;
+								}
+							}
+
+							active.insert(target.dest);
+							update_distance(target.dest, new_dist);
+						} 
+					} else {
+						auto mit = best_update[target.destRank].find(target.dest);
+						auto best = new_dist;
+						if (mit != best_update[target.destRank].end()) {
+							best = min(mit->second, new_dist);
+						}	
+						best_update[target.destRank][target.dest] = best;
+					}
+				}
+			}
+
+			vector<vector<int>> out_vertex(numProcesses);
+			vector<vector<long long>> out_dist(numProcesses);
+	
+			for(int rank = 0; rank < numProcesses; rank++) {
+				for(auto [dest, new_dist]: best_update[rank]) {
+					out_vertex[rank].push_back(dest);
+					out_dist[rank].push_back(new_dist);
+				}
+			}
+
+			auto in_vertex = shareWithAll<int>(out_vertex, MPI_INT);
+			auto in_dist = shareWithAll<long long>(out_dist, MPI_LONG_LONG);
+
+			for(int rank = 0; rank < numProcesses; rank++) {
+				for(int i = 0; i < in_vertex[rank].size(); i++) {
+					auto dest = in_vertex[rank][i];
+					auto new_dist = in_dist[rank][i];
+					non_local_relaxations++;
+					if (new_dist < dist[dest]) {
+						active.insert(dest); 
+						update_distance(dest, new_dist);
+					}	
+				} 
+			}
+		}
+
 		// Gather requests
 		vector<vector<tuple<int, long long, int>>> attributed_requests(numProcesses);
 		vector<set<int>> out_requests(numProcesses);
 		for(auto src: unsettled) {
-			auto edges_begin = edges[src].begin();
-			auto edges_end = std::lower_bound(edges[src].begin(), edges[src].end(), Target::lower(dist[src] - base));
+			auto edges_begin = long_edges[src].begin();
+			auto edges_end = long_edges[src].end();
 
 			for(auto it = edges_begin; it != edges_end; it++) {
 				auto& target = *it;
@@ -528,7 +629,7 @@ void deltaLongPhase(int base) {
 	}
 }
 
-template <bool classification, bool pull>
+template <bool classification, bool pull, bool push_pull>
 void deltaEpochEpilogue(int base) {
 	if constexpr(debug) {
 		err << " Delta epilogue" << std::endl;
@@ -542,7 +643,7 @@ void deltaEpochEpilogue(int base) {
 	}
 
 	if constexpr (classification) {
-		deltaLongPhase<pull>(base);
+		deltaLongPhase<pull, push_pull>(base);
 	}
 }
 
@@ -563,7 +664,7 @@ long long calc_min_dist() {
 	return global_min_dist;
 }
 
-template <bool classification, bool pull>
+template <bool classification, bool pull, bool push_pull>
 bool deltaEpoch() {
 	if constexpr (debug) {
 		err << "Starting new epoch nr: " << phases << std::endl;
@@ -581,7 +682,7 @@ bool deltaEpoch() {
 		non_phase_steps++;
 	}
 
-	deltaEpochEpilogue<classification, pull>(base);
+	deltaEpochEpilogue<classification, pull, push_pull>(base);
 
 	return true;
 }
@@ -591,15 +692,15 @@ void runBellmanFord() {
 	delta = inf - base;	
 
 	non_phase_steps++;
-	while(deltaEpoch<false, false>()) {
+	while(deltaEpoch<false, false, false>()) {
 		non_phase_steps++;
 	}
 }
 
-template<bool classification, bool pull, bool hybridize>
+template<bool classification, bool pull, bool push_pull, bool hybridize>
 void runDelta() {
 	phases++;
-	while(deltaEpoch<classification, pull>()) {
+	while(deltaEpoch<classification, pull, push_pull>()) {
 		phases++;
 		if constexpr(hybridize) {
 			int all_settled;
@@ -695,6 +796,8 @@ void setup() {
 			}
 			if (target.length < delta) {
 				short_edges[src].push_back(target);
+			} else {
+				long_edges[src].push_back(target);
 			}
 		}
 	}
@@ -729,6 +832,7 @@ void read(string file) {
 	length = end - start + 1;
 	edges->resize(length);
 	short_edges->resize(length);
+	long_edges->resize(length);
 	int x, y;
 	long long len;
 	while(in >> x) {
@@ -830,7 +934,7 @@ int main(int argc, char* argv[]) {
 
 	setup();
 
-	runDelta<true, true, false>();
+	runDelta<true, true, false, false>();
 
 	double end_time = MPI_Wtime();
 
