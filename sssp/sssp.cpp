@@ -783,7 +783,7 @@ void write_info() {
 		err << "Number of phases: " << phases << std::endl;
 		err << "Number of non phase steps: " << non_phase_steps << std::endl;
 		err << "Local relaxations in rank " << myRank << ": " << local_relaxations << std::endl;
-		err << "Local relaxations in summary " << global_relaxations << std::endl;
+		err << "Local relaxations in summary: " << global_relaxations << std::endl;
 		err << "Elapsed time: " << elapsed_time << "s" << std::endl;
 	}
 }
