@@ -25,9 +25,9 @@ static_assert(inf > 0, "Bad inf size");
 long long delta = inf;
 
 constexpr bool sanity = true;
-constexpr bool debug = false;
+constexpr bool debug = true;
 constexpr bool opt_delta = true;
-constexpr bool only_main = true;
+constexpr bool only_main = false;
 
 std::fstream err;
 
@@ -432,9 +432,6 @@ void deltaLongPhase(int base) {
 							}
 						}
 
-						if (dist[target.dest] >= base + delta) {
-							current_bucket.insert(target.dest);
-						}
 						active.insert(target.dest);
 						update_distance(target.dest, new_dist);
 					}
@@ -823,7 +820,7 @@ int main(int argc, char* argv[]) {
 
 	setup();
 
-	runDelta<true, true, true>();
+	runDelta<true, false, false>();
 
 	double end_time = MPI_Wtime();
 
