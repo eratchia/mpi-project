@@ -449,7 +449,16 @@ void deltaLongPhase(int base) {
 			auto first_too_long = std::lower_bound(long_edges[src].begin(), long_edges[src].end(), Target::lower(dist[src] - base));
 			pull_volume += (first_too_long - long_edges[src].begin());
 		}
-		take_pull = pull_volume < push_volume;
+		long long diff = pull_volume - push_volume;
+		long long all_diff = 0;
+		MPI_Allreduce(
+			&diff, 
+			&all_diff, 
+			1, MPI_LONG_LONG, 
+			MPI_SUM, 
+			MPI_COMM_WORLD
+		);
+		take_pull = diff > 0;
 	}
 	if (!take_pull) {
 		vector<unordered_map<int, long long>> best_update(numProcesses);
