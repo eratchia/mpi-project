@@ -257,7 +257,7 @@ inline void update_distance(int src, long long new_dist) {
 	if constexpr (sanity) {
 		auto it = vertices_by_distance.find({dist[src], src});
 		if (it == vertices_by_distance.end()) {
-			err << "<No vertex: " << src << " at distance: " << dist[src] << "while updating>" << std::endl; 
+			err << "<No vertex: " << src << " at distance: " << dist[src] << " while updating>" << std::endl; 
 		}
 	}
 
