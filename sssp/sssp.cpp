@@ -463,7 +463,7 @@ void deltaLongPhase(int base) {
 		auto in_dist = shareWithAll<long long>(out_dist, MPI_LONG_LONG);
 
 		for(int rank = 0; rank < numProcesses; rank++) {
-			for(int i = 0; i < in_vertex.size(); i++) {
+			for(int i = 0; i < in_vertex[rank].size(); i++) {
 				auto dest = in_vertex[rank][i];
 				auto new_dist = in_dist[rank][i];
 				if (new_dist < dist[dest]) {
