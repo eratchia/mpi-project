@@ -24,12 +24,12 @@ constexpr long long inf = 5'000'000'000'000'000'000;
 static_assert(inf > 0, "Bad inf size");
 long long delta = inf;
 
-constexpr bool sanity = true;
+constexpr bool sanity = false;
 constexpr bool debug = false;
 constexpr bool opt_delta = true;
 constexpr bool only_main = true;
 
-constexpr int opt_delta_percent = 10;
+constexpr int opt_delta_percent = 4;
 constexpr int tau_percent = 40;
 
 constexpr bool simple_short_long = true;
@@ -724,7 +724,7 @@ void runDelta() {
 				MPI_SUM, 
 				MPI_COMM_WORLD
 			);
-			if (all_settled * tau_percent / 100 >= all_vert) {
+			if (all_settled >= all_vert * tau_percent / 100) {
 				runBellmanFord();
 				break;
 			}
@@ -948,7 +948,7 @@ int main(int argc, char* argv[]) {
 
 	setup();
 
-	runDelta<true, true, false, false>();
+	runDelta<true, true, true, true>();
 
 	double end_time = MPI_Wtime();
 
