@@ -29,6 +29,9 @@ constexpr bool debug = false;
 constexpr bool opt_delta = true;
 constexpr bool only_main = true;
 
+constexpr int opt_delta_percent = 10;
+constexpr int tau_percent = 40;
+
 constexpr bool simple_short_long = true;
 
 std::fstream err;
@@ -458,7 +461,7 @@ void deltaLongPhase(int base) {
 			MPI_SUM, 
 			MPI_COMM_WORLD
 		);
-		take_pull = all_diff > 0;
+		take_pull = all_diff < 0;
 	}
 	if (!take_pull) {
 		vector<unordered_map<int, long long>> best_update(numProcesses);
@@ -721,7 +724,7 @@ void runDelta() {
 				MPI_SUM, 
 				MPI_COMM_WORLD
 			);
-			if (all_settled * 10 >= all_vert) {
+			if (all_settled * tau_percent / 100 >= all_vert) {
 				runBellmanFord();
 				break;
 			}
@@ -786,7 +789,7 @@ void setup() {
 			MPI_MAX,
 			MPI_COMM_WORLD
 		);
-		delta = std::max(10LL, max_len / 10);
+		delta = std::max(10LL, max_len * opt_delta_percent / 100);
 		if (myRank == 0 || !only_main) {
 			err << "Delta " << delta << " was chosen" << std::endl;
 		}

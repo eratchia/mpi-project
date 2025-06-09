@@ -49,4 +49,9 @@ In my solution I implemented all the optimizations with the exclusion of load ba
 All the performance tests were run 3 times per size with average time calculated. The graphs used were from the $RMAT-1$ family with weights selected independently at random from range $[0, 255]$ (Same as in the paper). The tests are based on weak scaling with vertices per node fixed at $1000 000$ (So about $40 000$ per process) on up to $32$ nodes. The graphs were generated using code written here: \url{https://github.com/farkhor/PaRMAT}. The generated graphs could have disconnected components but statistically they shouldn't be large.
 }
 
+\section{Communication}
+Non-setup communication is mostly handled using $MPI\_Alltoall$ and $MPI\_Alltoallv$. This means the amount of messages sent (Amount not size) will scale with the number of nodes. Communication using windows was an alternative which I was considering but in the way I was thinking about it would require windows linear in the number of vertices on the task.
+
+It should be possible to further improve communication by combining the data where I send for example ints and long longs.
+
 \end{document}
